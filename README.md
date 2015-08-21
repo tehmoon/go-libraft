@@ -7,7 +7,7 @@ Implementation of the Raft consensus algorithm in GO
 - [ ] Randomized Election Timeouts
 - [ ] Leader Heartbeat Broadcasting
 - [ ] Cluster Membership Change
-- [ ] Safe disk commit log appending
+- [ ] Safe Disk Commits For Logs
 - [ ] Index Based Log Replication
 - [ ] Snapshot Based Log Replication
 - [ ] Log Snapshoting
