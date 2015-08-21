@@ -1,12 +1,15 @@
 # go-libraft
 Implementation of the Raft consensus algorithm in GO.
 
-This is only a lib, it will try to respect as much as possible the Raft understanding and safety policy so people can use it to build on top of it.
+This is only a lib, it will try to respect as much as possible the Raft understanding and safety policy so people can use it to build anything on top of it.
 
 ie:
  - Raft as a service (zookeeper)
  - A new database
  - Some software with Raft embedded
+ - An API
+ - A game
+ - ...
 
 ## Features:
 
