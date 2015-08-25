@@ -23,7 +23,9 @@ ie:
 - [ ] Log Snapshoting
 - [ ] Log Compactation
 
-## Enhancements
+- [ ] json http RPCs
+
+## Possible Enhancements
 
 - [ ] Safe Channel between RPCs / TLS or PGP ?
 - [ ] Fast RPCs / protobuf ?
