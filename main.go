@@ -1,3 +1,4 @@
 package raft
 
-func main(){}
+func main(){
+}
