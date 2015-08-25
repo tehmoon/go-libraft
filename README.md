@@ -22,7 +22,6 @@ ie:
 - [ ] Snapshot Based Log Replication
 - [ ] Log Snapshoting
 - [ ] Log Compactation
-
 - [ ] json http RPCs
 
 ## Possible Enhancements
