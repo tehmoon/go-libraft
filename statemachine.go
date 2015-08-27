@@ -3,7 +3,6 @@ package raft
 import (
   "fmt"
   "time"
-  "log"
 )
 
 var INIT string = "init"
