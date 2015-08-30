@@ -118,14 +118,14 @@ func (s *StateMachine) Initialize() error {
   errC := make(chan error)
 
   for _, initFunc := range s.Init {
-    go func() {
-      err := initFunc()
+    go func(cb InitFunc) {
+      err := cb()
       if err != nil {
         errC <- err
       }
 
       errC <- nil
-    }()
+    }(initFunc)
   }
 
   s.Initialized = true
