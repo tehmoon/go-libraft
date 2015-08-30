@@ -5,16 +5,20 @@ import (
   "fmt"
 )
 
+// Used to store any field to interact with the RPC
+// functions
 type RPC struct {
   Server *http.Server
 }
 
+// Start the RPC server
 func (rpc *RPC) Start() error {
   err := rpc.Server.ListenAndServe()
 
   return err
 }
 
+// Create RPC connection
 func NewRPC() *RPC {
   mux := http.NewServeMux()
 
