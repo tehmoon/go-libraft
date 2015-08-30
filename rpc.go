@@ -19,7 +19,7 @@ func (rpc *RPC) Start() error {
 }
 
 // Create RPC connection
-func NewRPC() *RPC {
+func NewRPC() (*RPC, error) {
   mux := http.NewServeMux()
 
   server := &http.Server{
@@ -35,5 +35,5 @@ func NewRPC() *RPC {
     Server: server,
   }
 
-  return rpc
+  return rpc, nil
 }
