@@ -74,8 +74,9 @@ type InitFunc func() error
 
 type StateMachine struct {
   Init []InitFunc
-  Store *Storage
-  Rpc *RPC
+  Storage *Storage
+  RPC *RPC
+  State *State
   Initialized bool
 }
 
@@ -132,10 +133,11 @@ func NewStateMachine() *StateMachine  {
   }
 
   s.Initialized = false
+  s.State = STATE
 
   s.Init = append(s.Init, func() error {
     storage, err := NewStorage()
-    s.Store = storage
+    s.Storage = storage
 
     return err
   })
@@ -146,9 +148,9 @@ func NewStateMachine() *StateMachine  {
       return err
     }
 
-    s.Rpc = rpc
+    s.RPC = rpc
 
-    err = s.Rpc.Start()
+    err = s.RPC.Start()
     if err != nil {
       return err
     }
