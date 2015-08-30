@@ -10,11 +10,6 @@ var INIT string = "init"
 
 // Global State Object, main core of Raft
 const STATE *State = &State{
-  // Initialize status to INIT to prevent Raft of
-  // acting before every service has stated
-  Status: INIT,
-
-  C: make(chan string, 1),
 }
 
 // Internal struct
@@ -76,6 +71,7 @@ type StateMachine struct {
   Init []InitFunc
   Store *Storage
   Rpc *RPC
+  Initialized bool
 }
 
 // Initialize Init functions.
@@ -88,6 +84,11 @@ type StateMachine struct {
 func (s *StateMachine) Initialize() error {
   errC := make(chan error)
 
+  // Initialize status to INIT to prevent Raft of
+  // acting before every service has stated
+  STATE.Status = INIT
+  STATE.C = make(chan string, 1)
+
   for _, initFunc := range s.Init {
     go func() {
       err := initFunc()
@@ -99,9 +100,12 @@ func (s *StateMachine) Initialize() error {
     }()
   }
 
+  s.Initialized = true
+
   for _, _ = range s.Init {
     err := <- errC
     if err != nil {
+      s.Initialized = false
       return err
     }
   }
@@ -117,6 +121,8 @@ func (s *StateMachine) Initialize() error {
 // an array, and it's synchronized with channels to
 // pass references.
 func NewStateMachine() *StateMachine  {
+  s.Initialized = false
+
   s := &StateMachine{
     Init: make([]InitFunc, 0, 0),
   }
