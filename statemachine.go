@@ -9,7 +9,7 @@ import (
 var INIT string = "init"
 
 // Global State Object, main core of Raft
-var STATE *State = &State{
+const STATE *State = &State{
   // Initialize status to INIT to prevent Raft of
   // acting before every service has stated
   Status: INIT,
@@ -70,13 +70,79 @@ func (s *State) Switch(state string) error {
   return nil
 }
 
+type InitFunc func() error
+
 type StateMachine struct {
-  Init []func()
+  Init []InitFunc
+  Store *Storage
+  Rpc *RPC
 }
 
+// Initialize Init functions.
+// Each function are executed into go routines.
+// If some funcs are blocking Initialize will block,
+// otherwise, goroutines are destroyed.
+// If any errors are returned, Initialize will return,
+// the error and by that, it will cause all goroutines
+// to stop acting.
 func (s *StateMachine) Initialize() error {
+  errC := make(chan error)
+
+  for _, initFunc := range s.Init {
+    go func() {
+      err := initFunc()
+      if err != nil {
+        errC <- err
+      }
+
+      errC <- nil
+    }()
+  }
+
+  for _, _ = range s.Init {
+    err := <- errC
+    if err != nil {
+      return err
+    }
+  }
+
   return nil
 }
 
-func NewStateMachine() {
+// Create a state machine object that stores every
+// component of Raft, use this object to start Raft.
+// You also can overide fields before initialize the
+// state machine.
+// The functions of the state machine are stored in
+// an array, and it's synchronized with channels to
+// pass references.
+func NewStateMachine() *StateMachine  {
+  s := &StateMachine{
+    Init: make([]InitFunc, 0, 0),
+  }
+
+  s.Init = append(s.Init, func() error {
+    storage, err := NewStorage()
+    s.Store = storage
+
+    return err
+  })
+
+  s.Init = append(s.Init, func() error {
+    rpc, err := NewRPC()
+    if err != nil {
+      return err
+    }
+
+    s.Rpc = rpc
+
+    err = s.Rpc.Start()
+    if err != nil {
+      return err
+    }
+
+    return nil
+  })
+
+  return s
 }
