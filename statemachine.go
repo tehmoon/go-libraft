@@ -8,15 +8,6 @@ import (
 // Global warmup state
 var INIT string = "init"
 
-// Global State Object, main core of Raft
-var STATE *State = &State{
-  // Initialize status to INIT to prevent Raft of
-  // acting before every service has stated
-  Status: INIT,
-
-  C: make(chan string, 1),
-}
-
 type Callbacks struct {
   Callbacks []Callback
   C chan Callback
@@ -29,6 +20,16 @@ func (c *Callbacks) On(cb Callback) {
 
   c.Callbacks = append(c.Callbacks, <- c.C)
 }
+
+func NewCallbacks() *Callbacks {
+  cb := &Callbacks{
+    Callbacks: make([]Callback, 0, 0),
+    C: make(chan Callback, 1),
+  }
+
+  return cb
+}
+
 
 // Internal struct
 type State struct {
@@ -43,7 +44,7 @@ type State struct {
   C chan string
 
   // On every change call all the registred callbacks
-  Callbacks
+  *Callbacks
 }
 
 // Nicer method to get the current state than STATE.Status
@@ -154,10 +155,23 @@ func NewStateMachine() *StateMachine  {
   }
 
   s.Initialized = false
-  s.State = STATE
+
+  // Main core of Raft
+  // Maintain the state of the state machine
+  state := &State{
+    // Initialize status to INIT to prevent Raft of
+    // acting before every service has stated
+    Status: INIT,
+
+    C: make(chan string, 1),
+
+    Callbacks: NewCallbacks(),
+  }
+
+  s.State = state
 
   s.Init = append(s.Init, func() error {
-    storage, err := NewStorage()
+    storage, err := NewStorage(s.State)
     s.Storage = storage
 
     return err

@@ -18,6 +18,9 @@ type Storage struct {
 
   // Sync things
   C chan interface{}
+
+  // The state object the Storage can reused
+  State *State
 }
 
 // Append a log to the Logs array.
@@ -25,7 +28,7 @@ type Storage struct {
 // Returns the index
 func (s *Storage) AppendLog(payload interface{}) (uint64, error) {
   // Cannot store anything until state has not changed
-  if STATE.Is() == INIT {
+  if s.State.Is() == INIT {
     return s.Index, fmt.Errorf("System is not ready yet.")
   }
 
@@ -53,11 +56,12 @@ func (s *Storage) AppendLog(payload interface{}) (uint64, error) {
 // Here it's just a bounded in-memory array, everything is lost,
 // when starting the program, but you can use that function
 // to initialize the storage and the index
-func NewStorage() (*Storage, error) {
+func NewStorage(state *State) (*Storage, error) {
   storage := &Storage{
     Log: make([]interface{}, 0),
     Index: 0,
     C: make(chan interface{}, 1),
+    State: state,
   }
 
   return storage, nil
