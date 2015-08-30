@@ -25,7 +25,7 @@ type Storage struct {
 // Returns the index
 func (s *Storage) AppendLog(payload interface{}) (uint64, error) {
   // Cannot store anything until state has not changed
-  if STATE.Status == INIT {
+  if STATE.Is() == INIT {
     return s.Index, fmt.Errorf("System is not ready yet.")
   }
 
