@@ -82,6 +82,12 @@ type StateMachine struct {
 // the error and by that, it will cause all goroutines
 // to stop acting.
 func (s *StateMachine) Initialize() error {
+  if s.Initialized == true {
+    err := fmt.Errorf("StateMachine is already initialized.")
+
+    return err
+  }
+
   errC := make(chan error)
 
   // Initialize status to INIT to prevent Raft of
