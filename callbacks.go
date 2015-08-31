@@ -11,14 +11,14 @@ type Callbacks struct {
 
 type Callback func(state string)
 
-// .On appends a function to an array
+// .OnChange appends a function to an array
 // The function Callback should be pass as a reference
 // ie: blih := func(state string) {}
-// sm.State.On(blih)
-// sm.State.Remove(blih)
-// If it is passed like sm.State.On(func(s string){})
+// sm.State.OnChange(blih)
+// sm.State.RemoveChange(blih)
+// If it is passed like sm.State.OnChange(func(s string){})
 // the function will never be removable.
-func (c *Callbacks) On(cb Callback) {
+func (c *Callbacks) OnChange(cb Callback) {
   c.C <- struct{}{}
 
   c.Callbacks = append(c.Callbacks, cb)
@@ -29,11 +29,11 @@ func (c *Callbacks) On(cb Callback) {
 // Remove a callback from the array
 // The function Callback should be pass as a reference
 // ie: blih := func(state string) {}
-// sm.State.On(blih)
-// sm.State.Remove(blih)
-// If it is passed like sm.State.On(func(s string){})
+// sm.State.OnChange(blih)
+// sm.State.RemoveChange(blih)
+// If it is passed like sm.State.OnChange(func(s string){})
 // the function will never be removable.
-func (c *Callbacks) Remove(cb Callback) {
+func (c *Callbacks) RemoveChange(cb Callback) {
   c.C <- struct{}{}
   defer func() {
     <- c.C
@@ -71,7 +71,7 @@ func (c *Callbacks) Remove(cb Callback) {
   c.Callbacks = tmp
 }
 
-// Execute all the callbacks that was registered with .On
+// Execute all the callbacks that was registered with .OnChange
 func (c *Callbacks) Exec(state string) {
   c.C <- struct{}{}
 
