@@ -15,13 +15,24 @@ type State struct {
   // FOLLOWER: store logs, follow leader, vote for others
   // CANDIDATE: vote for themselves
   // LEADER: send logs, send heartbeats
-  Status string
+  Status string // INIT
+
+  // The currentTerm the server is
+  CurrentTerm uint64 // 0
+
+  // The candidateId that received vote in currentTerm
+  VotedFor string // ""
+
+  // The Id of this server.
+  // It is a concatation of RPCExtHost and RPCExtPort
+  // since there is only one network triplet per server.
+  MyId string // "0.0.0.0:11321"
 
   // Channel to sync everyting
   C chan string
 
   // On every change call all the registred callbacks
-  *Callbacks
+  *Callbacks // NewCallbacks()
 }
 
 // Nicer method to get the current state than STATE.Status
@@ -75,7 +86,7 @@ func (s *State) Switch(state string) error {
 // is not waiting on any other call.
 // Otherwise, missing calls and error returning will cause
 // the init loop to be stuck.
-type InitFunc func(ok chan struct{}) error
+type InitFunc func(s *StateMachine, ok chan struct{}) error
 
 type StateMachine struct {
   Init []InitFunc
@@ -83,6 +94,10 @@ type StateMachine struct {
   RPC *RPC
   State *State
   Initialized bool
+
+  // Configuration of the state machine so it can be reused
+  // by everyone.
+  Configuration *StateMachineConfiguration
 }
 
 // Initialize Init functions.
@@ -113,7 +128,7 @@ func (s *StateMachine) Initialize(cb func()) error {
   // since goroutine are used.
   for _, initFunc := range s.Init {
     go func(cb InitFunc) {
-      err := cb(ok)
+      err := cb(s, ok)
       if err != nil {
         errC <- err
       }
@@ -147,6 +162,20 @@ func (s *StateMachine) Initialize(cb func()) error {
   return nil
 }
 
+type StateMachineConfiguration struct {
+  // The host addr to listen to
+  RPCHost string // "0.0.0.0"
+
+  // The port number to listen to
+  RPCPort uint64 // 11321
+
+  // The host addr to give to clients (in case of NAT)
+  RPCExtHost string // NYI
+
+  // The port number to give to clients (in case of NAT)
+  RPCExtPort uint64 // NYI
+}
+
 // Create a state machine object that stores every
 // component of Raft, use this object to start Raft.
 // You also can overide fields before initialize the
@@ -154,12 +183,28 @@ func (s *StateMachine) Initialize(cb func()) error {
 // The functions of the state machine are stored in
 // an array, and it's synchronized with channels to
 // pass references.
-func NewStateMachine() *StateMachine  {
+func NewStateMachine(config *StateMachineConfiguration) (*StateMachine, error) {
   s := &StateMachine{
     Init: make([]InitFunc, 0, 0),
   }
 
   s.Initialized = false
+
+  if config == nil {
+    config = &StateMachineConfiguration{}
+  }
+
+  if config.RPCHost == "" {
+    config.RPCHost = "0.0.0.0"
+  }
+
+  if config.RPCPort == 0 {
+    config.RPCPort = 11321
+  }
+
+  s.Configuration = config
+
+  id := fmt.Sprintf("%s:%d", config.RPCHost, config.RPCPort)
 
   // Main core of Raft
   // Maintain the state of the state machine
@@ -168,6 +213,12 @@ func NewStateMachine() *StateMachine  {
     // acting before every service has stated
     Status: INIT,
 
+    CurrentTerm: 0,
+
+    VotedFor: "",
+
+    MyId: id,
+
     C: make(chan string, 1),
 
     Callbacks: NewCallbacks(),
@@ -175,7 +226,7 @@ func NewStateMachine() *StateMachine  {
 
   s.State = state
 
-  s.Init = append(s.Init, func(ok chan struct{}) error {
+  s.Init = append(s.Init, func(s *StateMachine, ok chan struct{}) error {
     var err error
 
     defer func(err error) {
@@ -196,7 +247,7 @@ func NewStateMachine() *StateMachine  {
     return err
   })
 
-  s.Init = append(s.Init, func(ok chan struct{}) error {
+  s.Init = append(s.Init, func(s *StateMachine, ok chan struct{}) error {
     var err error
 
     defer func(err error) {
@@ -205,7 +256,7 @@ func NewStateMachine() *StateMachine  {
       }
     }(err)
 
-    rpc, err := NewRPC()
+    rpc, err := NewRPC(s.Configuration)
     if err != nil {
       return err
     }
@@ -220,5 +271,5 @@ func NewStateMachine() *StateMachine  {
     return nil
   })
 
-  return s
+  return s, nil
 }

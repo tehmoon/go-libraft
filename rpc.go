@@ -24,7 +24,7 @@ func (rpc *RPC) Start(ok chan struct{}) error {
 }
 
 // Create RPC connection
-func NewRPC() (*RPC, error) {
+func NewRPC(config *StateMachineConfiguration) (*RPC, error) {
   mux := http.NewServeMux()
 
   server := &http.Server{
