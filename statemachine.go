@@ -8,29 +8,6 @@ import (
 // Global warmup state
 var INIT string = "init"
 
-type Callbacks struct {
-  Callbacks []Callback
-  C chan Callback
-}
-
-type Callback func(state string)
-
-func (c *Callbacks) On(cb Callback) {
-  c.C <- cb
-
-  c.Callbacks = append(c.Callbacks, <- c.C)
-}
-
-func NewCallbacks() *Callbacks {
-  cb := &Callbacks{
-    Callbacks: make([]Callback, 0, 0),
-    C: make(chan Callback, 1),
-  }
-
-  return cb
-}
-
-
 // Internal struct
 type State struct {
   // Status of raft:
@@ -87,7 +64,9 @@ func (s *State) Switch(state string) error {
 
   // Apply the status if the case bellow has been
   // correctly executed
-  s.Status = <- s.C
+  s.Status = state
+  s.Exec(state)
+  <- s.C
 
   return nil
 }
