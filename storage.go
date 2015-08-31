@@ -52,6 +52,16 @@ func (s *Storage) AppendLog(payload interface{}) (uint64, error) {
   return s.Index, nil
 }
 
+// Storage will be initialized
+func (s *Storage) Start(ok chan struct{}) error {
+  // Simulate some init time
+  <- time.Tick(3 * time.Second)
+
+  ok <- struct{}{}
+
+  return nil
+}
+
 // Initialize the storage
 // Here it's just a bounded in-memory array, everything is lost,
 // when starting the program, but you can use that function

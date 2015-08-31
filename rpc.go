@@ -12,7 +12,12 @@ type RPC struct {
 }
 
 // Start the RPC server
-func (rpc *RPC) Start() error {
+func (rpc *RPC) Start(ok chan struct{}) error {
+  // TODO: test the server
+  go func() {
+    ok <- struct{}{}
+  }()
+
   err := rpc.Server.ListenAndServe()
 
   return err
