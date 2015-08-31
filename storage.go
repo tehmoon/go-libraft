@@ -19,7 +19,7 @@ type Storage struct {
   // Sync things
   C chan interface{}
 
-  // The state object the Storage can reused
+  // The state object the Storage can be reused
   State *State
 }
 
