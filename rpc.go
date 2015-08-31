@@ -27,8 +27,10 @@ func (rpc *RPC) Start(ok chan struct{}) error {
 func NewRPC(config *StateMachineConfiguration) (*RPC, error) {
   mux := http.NewServeMux()
 
+  addr := fmt.Sprintf("%s:%d", config.RPCHost, config.RPCPort)
+
   server := &http.Server{
-    Addr: ":8081",
+    Addr: addr,
     Handler: mux,
   }
 
