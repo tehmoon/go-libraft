@@ -6,9 +6,9 @@ import "reflect"
 // init::done
 // state::changed   old, new string
 
-// Javascript register callback style
+// Javascript events style
 // All methods are safe
-type Callbacks struct {
+type Events struct {
   Callbacks map[string][]Callback
   C chan struct{}
 }
@@ -22,17 +22,18 @@ type Callback func(args ...interface{})
 // sm.State.Off("someState", blih)
 // If it is passed like sm.State.On("someState", func(args ...interface{}){})
 // the function will never be removable.
-func (c *Callbacks) On(name string, cb Callback) {
-  c.C <- struct{}{}
+func (e *Events) On(name string, cb Callback) {
+  e.C <- struct{}{}
+  defer func() {
+    <- e.C
+  }()
 
-  if cbs, found := c.Callbacks[name]; found {
-    c.Callbacks[name] = append(cbs, cb)
+  if cbs, found := e.Callbacks[name]; found {
+    e.Callbacks[name] = append(cbs, cb)
   } else {
-    c.Callbacks[name] = make([]Callback, 0, 0)
-    c.Callbacks[name] = append(c.Callbacks[name], cb)
+    e.Callbacks[name] = make([]Callback, 0, 0)
+    e.Callbacks[name] = append(e.Callbacks[name], cb)
   }
-
-  <- c.C
 }
 
 // Remove a callback from the array
@@ -42,13 +43,13 @@ func (c *Callbacks) On(name string, cb Callback) {
 // sm.State.Off("someState", blih)
 // If it is passed like sm.State.On("someState", func(args ...interface{}){})
 // the function will never be removable.
-func (c *Callbacks) Off(name string, cb Callback) {
-  c.C <- struct{}{}
+func (e *Events) Off(name string, cb Callback) {
+  e.C <- struct{}{}
   defer func() {
-    <- c.C
+    <- e.C
   }()
 
-  if cbs, found := c.Callbacks[name]; found {
+  if cbs, found := e.Callbacks[name]; found {
     length := len(cbs)
 
     foundAt := -1
@@ -78,19 +79,18 @@ func (c *Callbacks) Off(name string, cb Callback) {
       index = index + 1
     }
 
-    c.Callbacks[name] = tmp
+    e.Callbacks[name] = tmp
   }
 }
 
 // Execute all the callbacks that was registered with .On
-func (c *Callbacks) Exec(name string, args ...interface{}) {
-  c.C <- struct{}{}
-
+func (e *Events) Exec(name string, args ...interface{}) {
+  e.C <- struct{}{}
   defer func() {
-    <- c.C
+    <- e.C
   }()
 
-  if cbs, found := c.Callbacks[name]; found {
+  if cbs, found := e.Callbacks[name]; found {
     length := len(cbs)
 
     for i := 0; i < length; i++ {
@@ -102,11 +102,11 @@ func (c *Callbacks) Exec(name string, args ...interface{}) {
 }
 
 // Creates a callback array
-func NewCallbacks() *Callbacks {
-  cb := &Callbacks{
+func NewEvents() *Events {
+  e := &Events{
     Callbacks: make(map[string][]Callback, 0),
     C: make(chan struct{}, 1),
   }
 
-  return cb
+  return e
 }

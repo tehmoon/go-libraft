@@ -31,7 +31,7 @@ type State struct {
   // Channel to sync everyting
   C chan string
 
-  *Callbacks
+  *Events
 }
 
 // Nicer method to get the current state than STATE.Status
@@ -102,7 +102,7 @@ type StateMachine struct {
   Configuration *StateMachineConfiguration
 
   // On every change call all the registred callbacks
-  *Callbacks // NewCallbacks()
+  *Events // NewEvents()
 }
 
 // Initialize Init functions.
@@ -191,7 +191,7 @@ type StateMachineConfiguration struct {
 func NewStateMachine(config *StateMachineConfiguration) (*StateMachine, error) {
   s := &StateMachine{
     Init: make([]InitFunc, 0, 0),
-    Callbacks: NewCallbacks(),
+    Events: NewEvents(),
   }
 
   s.Initialized = false
@@ -223,7 +223,7 @@ func NewStateMachine(config *StateMachineConfiguration) (*StateMachine, error) {
     VotedFor: "",
     MyId: id,
     C: make(chan string, 1),
-    Callbacks: s.Callbacks,
+    Events: s.Events,
   }
 
   s.State = state
