@@ -83,7 +83,7 @@ func (e *Events) Off(name string, cb Callback) {
   }
 }
 
-// Execute all the callbacks that was registered with .On
+// Execute async all the callbacks that was registered with .On
 func (e *Events) Exec(name string, args ...interface{}) {
   e.C <- struct{}{}
   defer func() {
@@ -101,7 +101,7 @@ func (e *Events) Exec(name string, args ...interface{}) {
   }
 }
 
-// Execute all the callbacks that was registered with .On
+// Execute sync all the callbacks that was registered with .On
 func (e *Events) ExecSync(name string, args ...interface{}) {
   e.C <- struct{}{}
   defer func() {
