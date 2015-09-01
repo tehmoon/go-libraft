@@ -84,14 +84,7 @@ func (s *State) Switch(state string) error {
   return nil
 }
 
-// Defer should be called to make sure that the channel
-// is not waiting on any other call.
-// Otherwise, missing calls and error returning will cause
-// the init loop to be stuck.
-type InitFunc func(s *StateMachine, ok chan struct{}) error
-
 type StateMachine struct {
-  Init []InitFunc
   Storage *Storage
   RPC *RPC
   State *State
@@ -121,48 +114,24 @@ func (s *StateMachine) Initialize() error {
   }
 
   errC := make(chan error)
-  ok := make(chan struct{})
 
-  // That loop starts goroutine, it passes
-  // a channel that is used to tell the main
-  // program it's ok i'm initialized.
-  // If the goroutine is done executing, it sends
-  // an error interface, it will be catched by the
-  // last loop.
-  // Many funcs can be blocking it does not matter,
-  // since goroutine are used.
-  for _, initFunc := range s.Init {
-    go func(cb InitFunc) {
-      err := cb(s, ok)
-      if err != nil {
-        errC <- err
-      }
-
-      errC <- nil
-    }(initFunc)
-  }
-
-  // Sends ok to catch when funcs are ready
-  for _, _ = range s.Init {
-    <- ok
-  }
+  s.ExecSync("init::start", s, errC)
 
   // Funcs are initialized
   s.Initialized = true
   s.State.Switch(FOLLOWER)
-  go func() {
-    s.Exec("init::done")
-  }()
+  s.Exec("init::done")
 
+  // TODO: catch ERR
   // Catch optionnal errors
   // It will block if some functions blocks
-  for _, _ = range s.Init {
-    err := <- errC
-    if err != nil {
-      s.Initialized = false
-      return err
-    }
-  }
+  //for _, _ = range s.Init {
+    //err := <- errC
+    //if err != nil {
+      //s.Initialized = false
+      //return err
+    //}
+  //}
 
   return nil
 }
@@ -190,7 +159,6 @@ type StateMachineConfiguration struct {
 // pass references.
 func NewStateMachine(config *StateMachineConfiguration) (*StateMachine, error) {
   s := &StateMachine{
-    Init: make([]InitFunc, 0, 0),
     Events: NewEvents(),
   }
 
@@ -228,49 +196,48 @@ func NewStateMachine(config *StateMachineConfiguration) (*StateMachine, error) {
 
   s.State = state
 
-  s.Init = append(s.Init, func(s *StateMachine, ok chan struct{}) error {
+  s.On("init::start", func(args ...interface{}) {
     var err error
 
-    defer func(err error) {
-      if err != nil {
-        ok <- struct{}{}
-      }
-    }(err)
+    s := args[0].(*StateMachine)
+    errC := args[1].(chan error)
 
     storage, err := NewStorage(s.State)
     if err != nil {
-      return err
+      errC <- err
+      return
     }
 
     s.Storage = storage
 
-    err = storage.Start(ok)
-
-    return err
+    err = storage.Start()
+    if err != nil {
+      errC <- err
+      return
+    }
   })
 
-  s.Init = append(s.Init, func(s *StateMachine, ok chan struct{}) error {
+  s.On("init::start", func(args ...interface{}) {
     var err error
 
-    defer func(err error) {
-      if err != nil {
-        ok <- struct{}{}
-      }
-    }(err)
+    s := args[0].(*StateMachine)
+    errC := args[1].(chan error)
 
     rpc, err := NewRPC(s.Configuration)
     if err != nil {
-      return err
+      errC <- err
+      return
     }
 
     s.RPC = rpc
 
-    err = s.RPC.Start(ok)
-    if err != nil {
-      return err
-    }
-
-    return nil
+    go func() {
+      err = s.RPC.Start()
+      if err != nil {
+        errC <- err
+        return
+      }
+    }()
   })
 
   return s, nil

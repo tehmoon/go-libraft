@@ -53,11 +53,9 @@ func (s *Storage) AppendLog(payload interface{}) (uint64, error) {
 }
 
 // Storage will be initialized
-func (s *Storage) Start(ok chan struct{}) error {
+func (s *Storage) Start() error {
   // Simulate some init time
-  <- time.Tick(1 * time.Second)
-
-  ok <- struct{}{}
+  <- time.Tick(5 * time.Second)
 
   return nil
 }

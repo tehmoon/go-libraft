@@ -95,8 +95,24 @@ func (e *Events) Exec(name string, args ...interface{}) {
 
     for i := 0; i < length; i++ {
       go func(f Callback) {
-        f(args)
+        f(args...)
       }(cbs[i])
+    }
+  }
+}
+
+// Execute all the callbacks that was registered with .On
+func (e *Events) ExecSync(name string, args ...interface{}) {
+  e.C <- struct{}{}
+  defer func() {
+    <- e.C
+  }()
+
+  if cbs, found := e.Callbacks[name]; found {
+    length := len(cbs)
+
+    for i := 0; i < length; i++ {
+      cbs[i](args...)
     }
   }
 }
