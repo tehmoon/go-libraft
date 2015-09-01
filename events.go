@@ -8,6 +8,14 @@ import "reflect"
 
 // Javascript events style
 // All methods are safe
+// Since it is thread safe and only one action
+// can take place at the time, adding, executing,
+// removing callbacks will may not be in the order
+// you want to.
+// TODO: keep the global channel for global actions,
+// like adding or removing events, but I should add
+// a local channel to edit or execute events without
+// blocking all the other events.
 type Events struct {
   Callbacks map[string][]*Event
   C chan struct{}
@@ -17,6 +25,7 @@ type Event struct {
   Callback Callback
   Once bool
   Executed bool
+  C chan struct{}
 }
 
 type Callback func(args ...interface{})
