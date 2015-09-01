@@ -77,8 +77,9 @@ func (s *State) Switch(state string) error {
 
   // Apply the status if the case bellow has been
   // correctly executed
+  old := s.Status
   s.Status = state
-  s.Exec("state::changed", state)
+  s.Exec("state::changed", old, state)
 
   return nil
 }
@@ -148,10 +149,10 @@ func (s *StateMachine) Initialize() error {
 
   // Funcs are initialized
   s.Initialized = true
+  s.State.Switch(FOLLOWER)
   go func() {
     s.Exec("init::done")
   }()
-  s.State.Switch(FOLLOWER)
 
   // Catch optionnal errors
   // It will block if some functions blocks
