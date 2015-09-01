@@ -25,7 +25,6 @@ type Event struct {
   Callback Callback
   Once bool
   Executed bool
-  C chan struct{}
 }
 
 type Callback func(args ...interface{})
