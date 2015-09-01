@@ -31,8 +31,7 @@ type State struct {
   // Channel to sync everyting
   C chan string
 
-  // On every change call all the registred callbacks
-  *Callbacks // NewCallbacks()
+  *Callbacks
 }
 
 // Nicer method to get the current state than STATE.Status
@@ -76,7 +75,7 @@ func (s *State) Switch(state string) error {
   // Apply the status if the case bellow has been
   // correctly executed
   s.Status = state
-  s.Exec(state)
+  s.Exec("state::changed", state)
   <- s.C
 
   return nil
@@ -98,6 +97,9 @@ type StateMachine struct {
   // Configuration of the state machine so it can be reused
   // by everyone.
   Configuration *StateMachineConfiguration
+
+  // On every change call all the registred callbacks
+  *Callbacks // NewCallbacks()
 }
 
 // Initialize Init functions.
@@ -108,7 +110,7 @@ type StateMachine struct {
 // the error and by that, it will cause all goroutines
 // to stop acting.
 // Accepts a callback as argument so you know when init's done.
-func (s *StateMachine) Initialize(cb func()) error {
+func (s *StateMachine) Initialize() error {
   if s.Initialized == true {
     err := fmt.Errorf("StateMachine is already initialized.")
 
@@ -144,9 +146,9 @@ func (s *StateMachine) Initialize(cb func()) error {
 
   // Funcs are initialized
   s.Initialized = true
-  if cb != nil {
-    go cb()
-  }
+  go func() {
+    s.Exec("init::done")
+  }()
   s.State.Switch(FOLLOWER)
 
   // Catch optionnal errors
@@ -186,6 +188,7 @@ type StateMachineConfiguration struct {
 func NewStateMachine(config *StateMachineConfiguration) (*StateMachine, error) {
   s := &StateMachine{
     Init: make([]InitFunc, 0, 0),
+    Callbacks: NewCallbacks(),
   }
 
   s.Initialized = false
@@ -214,14 +217,10 @@ func NewStateMachine(config *StateMachineConfiguration) (*StateMachine, error) {
     Status: INIT,
 
     CurrentTerm: 0,
-
     VotedFor: "",
-
     MyId: id,
-
     C: make(chan string, 1),
-
-    Callbacks: NewCallbacks(),
+    Callbacks: s.Callbacks,
   }
 
   s.State = state

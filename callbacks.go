@@ -2,101 +2,117 @@ package raft
 
 import "reflect"
 
+// Callback list    args
+// init::done
+//
+
 // Javascript register callback style
 // All methods are safe
 type Callbacks struct {
-  Callbacks []Callback
+  Callbacks map[string][]Callback
   C chan struct{}
 }
 
-type Callback func(state string)
+type Callback func(args ...interface{})
 
-// .OnChange appends a function to an array
+// .On appends a function to an array
 // The function Callback should be pass as a reference
-// ie: blih := func(state string) {}
-// sm.State.OnChange(blih)
-// sm.State.RemoveChange(blih)
-// If it is passed like sm.State.OnChange(func(s string){})
+// ie: blih := func(args ...interface{}) {}
+// sm.State.On("someState", blih)
+// sm.State.Off("someState", blih)
+// If it is passed like sm.State.On("someState", func(args ...interface{}){})
 // the function will never be removable.
-func (c *Callbacks) OnChange(cb Callback) {
+func (c *Callbacks) On(name string, cb Callback) {
   c.C <- struct{}{}
 
-  c.Callbacks = append(c.Callbacks, cb)
+  if cbs, found := c.Callbacks[name]; found {
+    c.Callbacks[name] = append(cbs, cb)
+  } else {
+    c.Callbacks[name] = make([]Callback, 0, 0)
+    c.Callbacks[name] = append(c.Callbacks[name], cb)
+  }
 
   <- c.C
 }
 
 // Remove a callback from the array
 // The function Callback should be pass as a reference
-// ie: blih := func(state string) {}
-// sm.State.OnChange(blih)
-// sm.State.RemoveChange(blih)
-// If it is passed like sm.State.OnChange(func(s string){})
+// ie: blih := func(args ...interface{}) {}
+// sm.State.On("someState", blih)
+// sm.State.Off("someState", blih)
+// If it is passed like sm.State.On("someState", func(args ...interface{}){})
 // the function will never be removable.
-func (c *Callbacks) RemoveChange(cb Callback) {
+func (c *Callbacks) Off(name string, cb Callback) {
   c.C <- struct{}{}
   defer func() {
     <- c.C
   }()
 
-  length := len(c.Callbacks)
+  if cbs, found := c.Callbacks[name]; found {
+    length := len(cbs)
 
-  foundAt := -1
+    foundAt := -1
 
-  for i, f := range c.Callbacks {
-    if reflect.ValueOf(f).Pointer() == reflect.ValueOf(cb).Pointer() {
-      foundAt = i
-      break
-    }
-  }
-
-  if foundAt == -1 {
-    return
-  }
-
-  tmp := make([]Callback, length -1)
-
-  index := 0
-
-  for i := 0; i < length; i++ {
-    if reflect.ValueOf(c.Callbacks[i]).Pointer() == reflect.ValueOf(cb).Pointer() {
-      continue
+    for i, f := range cbs {
+      if reflect.ValueOf(f).Pointer() == reflect.ValueOf(cb).Pointer() {
+        foundAt = i
+        break
+      }
     }
 
-    tmp[index] = c.Callbacks[i]
-    index = index + 1
+    if foundAt == -1 {
+      return
+    }
+
+    tmp := make([]Callback, length -1)
+
+    index := 0
+
+    for i := 0; i < length; i++ {
+      // Compare two pointer value
+      if reflect.ValueOf(cbs[i]).Pointer() == reflect.ValueOf(cb).Pointer() {
+        continue
+      }
+
+      tmp[index] = cbs[i]
+      index = index + 1
+    }
+
+
+    cbs = tmp
   }
-
-
-  c.Callbacks = tmp
 }
 
-// Execute all the callbacks that was registered with .OnChange
-func (c *Callbacks) Exec(state string) {
+// Execute all the callbacks that was registered with .On
+func (c *Callbacks) Exec(name string, args ...interface{}) {
   c.C <- struct{}{}
 
-  length := len(c.Callbacks)
+  defer func() {
+    <- c.C
+  }()
 
-  synchronize := make(chan struct{}, 0)
+  if cbs, found := c.Callbacks[name]; found {
+    length := len(cbs)
 
-  for i := 0; i < length; i++ {
-    go func(f Callback) {
-      f(state)
-      synchronize <- struct{}{}
-    }(c.Callbacks[i])
+    synchronize := make(chan struct{}, 0)
+
+    for i := 0; i < length; i++ {
+      go func(f Callback) {
+        f(args)
+        synchronize <- struct{}{}
+      }(cbs[i])
+    }
+
+    for i := 0; i < length; i++ {
+      <- synchronize
+    }
   }
-
-  for i := 0; i < length; i++ {
-    <- synchronize
-  }
-
-  <- c.C
 }
 
 // Creates a callback array
 func NewCallbacks() *Callbacks {
   cb := &Callbacks{
-    Callbacks: make([]Callback, 0, 0),
+    Callbacks: make(map[string][]Callback, 0),
     C: make(chan struct{}, 1),
   }
 
