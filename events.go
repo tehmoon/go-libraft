@@ -9,8 +9,14 @@ import "reflect"
 // Javascript events style
 // All methods are safe
 type Events struct {
-  Callbacks map[string][]Callback
+  Callbacks map[string][]*Event
   C chan struct{}
+}
+
+type Event struct {
+  Callback Callback
+  Once bool
+  Executed bool
 }
 
 type Callback func(args ...interface{})
@@ -29,10 +35,58 @@ func (e *Events) On(name string, cb Callback) {
   }()
 
   if cbs, found := e.Callbacks[name]; found {
-    e.Callbacks[name] = append(cbs, cb)
+    event := &Event{
+      Callback: cb,
+      Once: false,
+      Executed: false,
+    }
+
+    e.Callbacks[name] = append(cbs, event)
   } else {
-    e.Callbacks[name] = make([]Callback, 0, 0)
-    e.Callbacks[name] = append(e.Callbacks[name], cb)
+    e.Callbacks[name] = make([]*Event, 0, 0)
+
+    event := &Event{
+      Callback: cb,
+      Once: false,
+      Executed: false,
+    }
+
+    e.Callbacks[name] = append(e.Callbacks[name], event)
+  }
+}
+
+// .Once appends a function to an array
+// When the function is executed, it will be deferenced.
+// The function Callback should be pass as a reference
+// ie: blih := func(args ...interface{}) {}
+// sm.State.Once("someState", blih)
+// sm.State.Off("someState", blih)
+// If it is passed like sm.State.Once("someState", func(args ...interface{}){})
+// the function will never be removable.
+func (e *Events) Once(name string, cb Callback) {
+  e.C <- struct{}{}
+  defer func() {
+    <- e.C
+  }()
+
+  if cbs, found := e.Callbacks[name]; found {
+    event := &Event{
+      Callback: cb,
+      Once: true,
+      Executed: false,
+    }
+
+    e.Callbacks[name] = append(cbs, event)
+  } else {
+    e.Callbacks[name] = make([]*Event, 0, 0)
+
+    event := &Event{
+      Callback: cb,
+      Once: true,
+      Executed: false,
+    }
+
+    e.Callbacks[name] = append(e.Callbacks[name], event)
   }
 }
 
@@ -54,8 +108,8 @@ func (e *Events) Off(name string, cb Callback) {
 
     foundAt := -1
 
-    for i, f := range cbs {
-      if reflect.ValueOf(f).Pointer() == reflect.ValueOf(cb).Pointer() {
+    for i, event := range cbs{
+      if reflect.ValueOf(event.Callback).Pointer() == reflect.ValueOf(cb).Pointer() {
         foundAt = i
         break
       }
@@ -65,13 +119,13 @@ func (e *Events) Off(name string, cb Callback) {
       return
     }
 
-    tmp := make([]Callback, length -1)
+    tmp := make([]*Event, length -1)
 
     index := 0
 
     for i := 0; i < length; i++ {
       // Compare two pointer value
-      if reflect.ValueOf(cbs[i]).Pointer() == reflect.ValueOf(cb).Pointer() {
+      if reflect.ValueOf(cbs[i].Callback).Pointer() == reflect.ValueOf(cb).Pointer() {
         continue
       }
 
@@ -94,8 +148,16 @@ func (e *Events) Exec(name string, args ...interface{}) {
     length := len(cbs)
 
     for i := 0; i < length; i++ {
-      go func(f Callback) {
-        f(args...)
+      go func(event *Event) {
+        if event.Once == true  && event.Executed == true {
+        } else {
+          event.Callback(args...)
+          event.Executed = true
+
+          if event.Once == true {
+            e.Off(name, event.Callback)
+          }
+        }
       }(cbs[i])
     }
   }
@@ -112,7 +174,17 @@ func (e *Events) ExecSync(name string, args ...interface{}) {
     length := len(cbs)
 
     for i := 0; i < length; i++ {
-      cbs[i](args...)
+      event := cbs[i]
+
+      if event.Once == true  && event.Executed == true {
+      } else {
+        event.Callback(args...)
+        event.Executed = true
+
+        if event.Once == true {
+          e.Off(name, event.Callback)
+        }
+      }
     }
   }
 }
@@ -120,7 +192,7 @@ func (e *Events) ExecSync(name string, args ...interface{}) {
 // Creates a callback array
 func NewEvents() *Events {
   e := &Events{
-    Callbacks: make(map[string][]Callback, 0),
+    Callbacks: make(map[string][]*Event, 0),
     C: make(chan struct{}, 1),
   }
 
