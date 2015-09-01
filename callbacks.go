@@ -4,7 +4,7 @@ import "reflect"
 
 // Callback list    args
 // init::done
-//
+// state::changed   old, new string
 
 // Javascript register callback style
 // All methods are safe
