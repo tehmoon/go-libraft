@@ -78,8 +78,7 @@ func (c *Callbacks) Off(name string, cb Callback) {
       index = index + 1
     }
 
-
-    cbs = tmp
+    c.Callbacks[name] = tmp
   }
 }
 
@@ -94,17 +93,10 @@ func (c *Callbacks) Exec(name string, args ...interface{}) {
   if cbs, found := c.Callbacks[name]; found {
     length := len(cbs)
 
-    synchronize := make(chan struct{}, 0)
-
     for i := 0; i < length; i++ {
       go func(f Callback) {
         f(args)
-        synchronize <- struct{}{}
       }(cbs[i])
-    }
-
-    for i := 0; i < length; i++ {
-      <- synchronize
     }
   }
 }

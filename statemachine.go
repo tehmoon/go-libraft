@@ -57,6 +57,9 @@ func (s *State) Switch(state string) error {
   switch state {
     case FOLLOWER, CANDIDATE, LEADER:
       s.C <- state
+      defer func() {
+        <- s.C
+      }()
     default:
       return fmt.Errorf("Only supported operations: FOLLOWER, CANDIDATE or LEADER.")
   }
@@ -76,7 +79,6 @@ func (s *State) Switch(state string) error {
   // correctly executed
   s.Status = state
   s.Exec("state::changed", state)
-  <- s.C
 
   return nil
 }
