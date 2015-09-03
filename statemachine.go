@@ -84,11 +84,49 @@ func (s *State) Switch(state string) error {
   return nil
 }
 
+type Node struct {
+  Ip string
+  Port uint64
+}
+
+type Cluster struct {
+  Nodes map[string]Node
+  C chan struct{}
+}
+
+func (c *Cluster) Add(n Node) (string, bool) {
+  c.C <- struct{}{}
+  defer func() {
+    <- c.C
+  }()
+
+  name := fmt.Sprintf("%s:%d", n.Ip, n.Port)
+
+  if _, ok := c.Nodes[name]; ok {
+    return name, false
+  }
+
+  c.Nodes[name] = n
+
+  return name, true
+}
+
+func NewCluster() *Cluster {
+  cluster := &Cluster {
+    C: make(chan struct{}, 1),
+    Nodes: make(map[string]Node),
+  }
+
+  return cluster
+}
+
 type StateMachine struct {
   Storage *Storage
   RPC *RPC
   State *State
   Initialized bool
+
+  Cluster *Cluster
 
   // Configuration of the state machine so it can be reused
   // by everyone.
@@ -110,6 +148,11 @@ func (s *StateMachine) Initialize() error {
   if s.Initialized == true {
     err := fmt.Errorf("StateMachine is already initialized.")
 
+    return err
+  }
+
+  if len(s.Cluster.Nodes) < 3 {
+    err := fmt.Errorf("Cannot initialize when cluster size is < 3.")
     return err
   }
 
@@ -178,7 +221,8 @@ func NewStateMachine(config *StateMachineConfiguration) (*StateMachine, error) {
 
   s.Configuration = config
 
-  id := fmt.Sprintf("%s:%d", config.RPCHost, config.RPCPort)
+  s.Cluster = NewCluster()
+  id, _ := s.Cluster.Add(Node{config.RPCHost, config.RPCPort})
 
   // Main core of Raft
   // Maintain the state of the state machine
@@ -195,6 +239,7 @@ func NewStateMachine(config *StateMachineConfiguration) (*StateMachine, error) {
   }
 
   s.State = state
+
 
   s.On("init::start", func(args ...interface{}) {
     var err error
@@ -238,6 +283,13 @@ func NewStateMachine(config *StateMachineConfiguration) (*StateMachine, error) {
         return
       }
     }()
+  })
+
+  s.On("timeout::elapsed", func(args ...interface{}) {
+    s := args[0].(*StateMachine)
+
+    fmt.Println("timeout elapsed!")
+    s.State.Switch(CANDIDATE)
   })
 
   return s, nil
