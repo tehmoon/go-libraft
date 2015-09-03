@@ -23,10 +23,10 @@ func (rpc *RPC) Start() error {
 }
 
 // Create RPC connection
-func NewRPC(config *StateMachineConfiguration) (*RPC, error) {
+func NewRPC(sm *StateMachine) (*RPC, error) {
   mux := http.NewServeMux()
 
-  addr := fmt.Sprintf("%s:%d", config.RPCHost, config.RPCPort)
+  addr := fmt.Sprintf("%s:%d", sm.Configuration.RPCHost, sm.Configuration.RPCPort)
 
   server := &http.Server{
     Addr: addr,
@@ -35,6 +35,15 @@ func NewRPC(config *StateMachineConfiguration) (*RPC, error) {
 
   mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
     fmt.Fprintf(w, "Hello World!")
+  })
+  mux.HandleFunc("/appendEntry", func(w http.ResponseWriter, r *http.Request) {
+    err := r.ParseForm()
+    if err != nil {
+      w.WriteHeader(406)
+      return
+    }
+
+    // TODO: Parse payload
   })
 
   rpc := &RPC{

@@ -268,7 +268,7 @@ func NewStateMachine(config *StateMachineConfiguration) (*StateMachine, error) {
     s := args[0].(*StateMachine)
     errC := args[1].(chan error)
 
-    rpc, err := NewRPC(s.Configuration)
+    rpc, err := NewRPC(s)
     if err != nil {
       errC <- err
       return
