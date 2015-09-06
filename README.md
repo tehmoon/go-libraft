@@ -33,4 +33,6 @@ ie:
 
 ## Disclamer
 
-This project is under heavy developpement, it is part of my way to understand consensus algorithms.
+This project is under heavy developpement, it is part of my way to understand consensus algorithms AND not suitable for any production use.
+
+Issues are welcomed but I'll (at the moment) not accept any PR. Once all the basic feature will work I'll be happy to welcome everyone to participate.
