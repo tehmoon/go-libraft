@@ -29,3 +29,8 @@ ie:
 - [ ] Safe Channel between RPCs / TLS or PGP ?
 - [ ] Fast RPCs / protobuf ?
 - [ ] Embedded Database / RocksDB ?
+- 
+
+## Disclamer
+
+This project is under heavy developpement, it is part of my way to understand consensus algorithms.
