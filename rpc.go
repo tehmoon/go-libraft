@@ -66,6 +66,20 @@ func NewRPC(sm *StateMachine) (*RPC, error) {
     }
     // end parsing term
 
+    // start parsing prevLogTerm
+    prevLogTerm, ok := r.Form["prevLogTerm"]
+    if !ok || prevLogTerm[0] == "" {
+      w.WriteHeader(422)
+      return
+    }
+
+    prevTerm, err := strconv.ParseUint(prevLogTerm[0], 10, 0)
+    if err != nil {
+      w.WriteHeader(422)
+      return
+    }
+    // end parsing prevLogTerm
+
     // start parsing prevLogIndex
     prevLogIndex, ok := r.Form["prevLogIndex"]
     if !ok || prevLogIndex[0] == "" {
@@ -79,14 +93,29 @@ func NewRPC(sm *StateMachine) (*RPC, error) {
       return
     }
 
+    // Acquire the lock
+    sm.Storage.C <- struct{}{}
+    defer func() {
+      <- sm.Storage.C
+    }()
+
     // if the previous index of the leader is superior to
-    // the number of logs stored on this server then
-    // tell him to retry sending logs but with a lower index
+    // the number of logs stored on this server and it is not the
+    // first log appened then verify if the term entry corresponds
+    // to the indexed log, otherwise tell him to retry
+    // sending logs but with a lower index
     if prevIndex > sm.Storage.Index {
       w.WriteHeader(416)
       return
+    } else if prevIndex != 0 && sm.Storage.Index == 0 {
+      w.WriteHeader(416)
+      return
+    } else if sm.Storage.Index != 0 {
+      if sm.Storage.Logs[prevIndex].Term != prevTerm {
+        w.WriteHeader(416)
+        return
+      }
     }
-
     // end parsing term
 
     // start parsing body
@@ -106,14 +135,21 @@ func NewRPC(sm *StateMachine) (*RPC, error) {
           return
         }
 
-        fmt.Println(logs)
+        for _, log := range logs {
+          sm.Storage.AppendLog(prevIndex, &log)
+          prevIndex++
+        }
+
+        sm.State.C <- struct{}{}
+        sm.State.CurrentTerm = termId
+        <- sm.State.C
+
+        fmt.Println(sm.Storage.Logs)
       default:
         w.WriteHeader(415)
         return
     }
     // end parsing body
-
-
   })
 
   rpc := &RPC{

@@ -39,41 +39,34 @@ type Log struct {
 // Append a log to the Logs array.
 // It can be any value
 // Returns the index
-func (s *Storage) AppendLog(term uint64, payload interface{}) (uint64, error) {
+func (s *Storage) AppendLog(index uint64, log *Log) (uint64, error) {
   // Cannot store anything until state has not changed
   if s.State.Is() == INIT {
     return s.Index, fmt.Errorf("System is not ready yet.")
   }
 
-  s.C <- struct{}{}
-
-  // Append the log to memory
-  // and set the index to the length
-  // of the log's array.
-  // With on-disk array the index will be incremented
-  // like s.Index = s.Index + 1 after log has safely
-  // been written to storage.
-  log := Log{
-    Term: term,
-    Payload: payload,
+  if len(s.C) != 1 {
+    return s.Index, fmt.Errorf("Storage has to be locked before using it.")
   }
 
-  s.Logs = append(s.Logs, log)
-  s.Index = s.Index + 1
+  if index < uint64(len(s.Logs)) {
+  fmt.Println("length:",len(s.Logs))
+  fmt.Println("index:", index)
+    s.Logs[index] = *log
+    s.Index = index
+  } else {
+    s.Logs = append(s.Logs, *log)
+    s.Index = s.Index + 1
+  }
 
   // Simulate the storage, 10 ms
   <- time.Tick(10 * time.Millisecond)
-
-  <- s.C
 
   return s.Index, nil
 }
 
 // Storage will be initialized
 func (s *Storage) Start() error {
-  // Simulate some init time
-  <- time.Tick(5 * time.Second)
-
   return nil
 }
 
