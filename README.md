@@ -29,7 +29,6 @@ ie:
 - [ ] Safe Channel between RPCs / TLS or PGP ?
 - [ ] Fast RPCs / protobuf ?
 - [ ] Embedded Database / RocksDB ?
-- 
 
 ## Disclamer
 
