@@ -29,3 +29,10 @@ ie:
 - [ ] Safe Channel between RPCs / TLS or PGP ?
 - [ ] Fast RPCs / protobuf ?
 - [ ] Embedded Database / RocksDB ?
+- 
+
+## Disclamer
+
+This project is under heavy developpement, it is part of my way to understand consensus algorithms AND not suitable for any production use.
+
+Issues are welcomed but I'll (at the moment) not accept any PR. Once all the basic features will work I'll be happy to welcome everyone to participate.
