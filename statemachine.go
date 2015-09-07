@@ -29,7 +29,7 @@ type State struct {
   MyId string // "0.0.0.0:11321"
 
   // Channel to sync everyting
-  C chan string
+  C chan struct{}
 
   *Events
 }
@@ -56,7 +56,7 @@ func (s *State) Switch(state string) error {
   // Checking correct state has argument
   switch state {
     case FOLLOWER, CANDIDATE, LEADER:
-      s.C <- state
+      s.C <- struct{}{}
       defer func() {
         <- s.C
       }()
@@ -234,7 +234,7 @@ func NewStateMachine(config *StateMachineConfiguration) (*StateMachine, error) {
     CurrentTerm: 0,
     VotedFor: "",
     MyId: id,
-    C: make(chan string, 1),
+    C: make(chan struct{}, 1),
     Events: s.Events,
   }
 
