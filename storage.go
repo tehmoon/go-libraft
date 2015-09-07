@@ -11,7 +11,7 @@ import (
 type Storage struct {
   // Logs are in memory for now but it's going to change
   // when Raft will be implemented
-  Logs []*Log
+  Logs Logs
 
   // Maintain the index in memory
   Index uint64
@@ -23,12 +23,14 @@ type Storage struct {
   State *State
 }
 
+type Logs []Log
+
 type Log struct {
   // The term when the index has been stored
-  Term uint64
+  Term uint64 `json:"term"`
 
   // The actual log
-  Payload interface{}
+  Payload interface{} `json:"payload"`
 
   // Litteral without specify names wont work
   _ struct{}
@@ -51,7 +53,7 @@ func (s *Storage) AppendLog(term uint64, payload interface{}) (uint64, error) {
   // With on-disk array the index will be incremented
   // like s.Index = s.Index + 1 after log has safely
   // been written to storage.
-  log := &Log{
+  log := Log{
     Term: term,
     Payload: payload,
   }
@@ -81,7 +83,7 @@ func (s *Storage) Start() error {
 // to initialize the storage and the index
 func NewStorage(state *State) (*Storage, error) {
   storage := &Storage{
-    Logs: make([]*Log, 0),
+    Logs: make(Logs, 0),
     Index: 0,
     C: make(chan struct{}, 1),
     State: state,
