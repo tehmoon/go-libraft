@@ -5,6 +5,7 @@ import "reflect"
 // Callback list    args
 // init::done
 // state::changed   old, new string
+// term::changed    old, new int64
 
 // Javascript events style
 // All methods are safe

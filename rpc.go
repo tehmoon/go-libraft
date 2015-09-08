@@ -57,6 +57,8 @@ func NewRPC(sm *StateMachine) (*RPC, error) {
       <- sm.State.C
     }()
 
+    oldTerm := sm.State.CurrentTerm
+
     err := r.ParseForm()
     if err != nil {
       statusCode = 422
@@ -70,13 +72,13 @@ func NewRPC(sm *StateMachine) (*RPC, error) {
       return
     }
 
-    termId, err := strconv.ParseUint(term[0], 10, 0)
+    newTerm, err := strconv.ParseUint(term[0], 10, 0)
     if err != nil {
       statusCode = 422
       return
     }
 
-    if termId < sm.State.CurrentTerm {
+    if newTerm < sm.State.CurrentTerm {
       statusCode = 422
       return
     }
@@ -147,9 +149,9 @@ func NewRPC(sm *StateMachine) (*RPC, error) {
           return
         }
 
-        if len(logs) == 0 && termId != sm.State.CurrentTerm {
-          sm.State.CurrentTerm = termId
-          sm.Exec("term::changed", termId)
+        if len(logs) == 0 && newTerm != sm.State.CurrentTerm {
+          sm.State.CurrentTerm = newTerm
+          sm.Exec("term::changed", oldTerm, newTerm)
         }
       default:
         statusCode = 415
