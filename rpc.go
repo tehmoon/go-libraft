@@ -66,54 +66,54 @@ func NewRPC(sm *StateMachine) (*RPC, error) {
     }
     // end parsing term
 
-    // start parsing leaderCommit
-    leaderCommitValue, ok := r.Form["leaderCommit"]
-    if !ok || leaderCommitValue[0] == "" {
-      w.WriteHeader(422)
-      return
-    }
+    //// start parsing leaderCommit
+    //leaderCommitValue, ok := r.Form["leaderCommit"]
+    //if !ok || leaderCommitValue[0] == "" {
+      //w.WriteHeader(422)
+      //return
+    //}
 
-    leaderCommit, err := strconv.ParseInt(leaderCommitValue[0], 10, 0)
-    if err != nil {
-      w.WriteHeader(422)
-      return
-    }
-    // end parsing leaderCommit
+    //leaderCommit, err := strconv.ParseInt(leaderCommitValue[0], 10, 0)
+    //if err != nil {
+      //w.WriteHeader(422)
+      //return
+    //}
+    //// end parsing leaderCommit
 
-    // start parsing prevLogTerm
-    prevLogTerm, ok := r.Form["prevLogTerm"]
-    if !ok || prevLogTerm[0] == "" {
-      w.WriteHeader(422)
-      return
-    }
+    //// start parsing prevLogTerm
+    //prevLogTerm, ok := r.Form["prevLogTerm"]
+    //if !ok || prevLogTerm[0] == "" {
+      //w.WriteHeader(422)
+      //return
+    //}
 
-    prevTerm, err := strconv.ParseUint(prevLogTerm[0], 10, 0)
-    if err != nil {
-      w.WriteHeader(422)
-      return
-    }
-    // end parsing prevLogTerm
+    //prevTerm, err := strconv.ParseUint(prevLogTerm[0], 10, 0)
+    //if err != nil {
+      //w.WriteHeader(422)
+      //return
+    //}
+    //// end parsing prevLogTerm
 
-    // start parsing prevLogIndex
-    prevLogIndex, ok := r.Form["prevLogIndex"]
-    if !ok || prevLogIndex[0] == "" {
-      w.WriteHeader(422)
-      return
-    }
+    //// start parsing prevLogIndex
+    //prevLogIndex, ok := r.Form["prevLogIndex"]
+    //if !ok || prevLogIndex[0] == "" {
+      //w.WriteHeader(422)
+      //return
+    //}
 
-    prevIndex, err := strconv.ParseInt(prevLogIndex[0], 10, 0)
-    if err != nil {
-      w.WriteHeader(422)
-      return
-    }
+    //prevIndex, err := strconv.ParseInt(prevLogIndex[0], 10, 0)
+    //if err != nil {
+      //w.WriteHeader(422)
+      //return
+    //}
 
-    // Acquire the lock
-    sm.Storage.C <- struct{}{}
-    defer func() {
-      <- sm.Storage.C
-    }()
+    //// Acquire the lock
+    //sm.Storage.C <- struct{}{}
+    //defer func() {
+      //<- sm.Storage.C
+    //}()
 
-    // end parsing term
+    //// end parsing term
 
     // start parsing body
     body, err := ioutil.ReadAll(r.Body)
@@ -145,17 +145,6 @@ func NewRPC(sm *StateMachine) (*RPC, error) {
         return
     }
     // end parsing body
-
-    if leaderCommit > sm.Storage.Index {
-      if leaderCommit > prevIndex {
-        sm.Storage.Index = prevIndex + 1
-      } else {
-        sm.Storage.Index = leaderCommit
-      }
-    }
-
-    fmt.Println("index at:", sm.Storage.Index)
-    fmt.Println("length is:", len(sm.Storage.Logs))
   })
 
   rpc := &RPC{
