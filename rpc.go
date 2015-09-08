@@ -46,7 +46,7 @@ func NewRPC(sm *StateMachine) (*RPC, error) {
     // with the header in a defer function's call
     statusCode := 200
 
-    // Acquire the lock since we'll write
+    // Acquire the lock since we'll write and we don't want dirty reads
     sm.State.C <- struct{}{}
     defer func() {
       // Send back the Current-Term in the response
