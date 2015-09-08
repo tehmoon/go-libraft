@@ -14,7 +14,7 @@ type Storage struct {
   Logs Logs
 
   // Maintain the index in memory
-  Index uint64
+  Index int64
 
   // Sync things
   C chan struct{}
@@ -39,7 +39,7 @@ type Log struct {
 // Append a log to the Logs array.
 // It can be any value
 // Returns the index
-func (s *Storage) AppendLog(index uint64, log *Log) (uint64, error) {
+func (s *Storage) AppendLog(index int64, log *Log) (int64, error) {
   // Cannot store anything until state has not changed
   if s.State.Is() == INIT {
     return s.Index, fmt.Errorf("System is not ready yet.")
@@ -49,9 +49,9 @@ func (s *Storage) AppendLog(index uint64, log *Log) (uint64, error) {
     return s.Index, fmt.Errorf("Storage has to be locked before using it.")
   }
 
-  if index < uint64(len(s.Logs)) {
-  fmt.Println("length:",len(s.Logs))
-  fmt.Println("index:", index)
+  return 0, fmt.Errorf("NYI")
+
+  if index < int64(len(s.Logs)) {
     s.Logs[index] = *log
     s.Index = index
   } else {
@@ -77,7 +77,7 @@ func (s *Storage) Start() error {
 func NewStorage(state *State) (*Storage, error) {
   storage := &Storage{
     Logs: make(Logs, 0),
-    Index: 0,
+    Index: -1,
     C: make(chan struct{}, 1),
     State: state,
   }

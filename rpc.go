@@ -66,6 +66,20 @@ func NewRPC(sm *StateMachine) (*RPC, error) {
     }
     // end parsing term
 
+    // start parsing leaderCommit
+    leaderCommitValue, ok := r.Form["leaderCommit"]
+    if !ok || leaderCommitValue[0] == "" {
+      w.WriteHeader(422)
+      return
+    }
+
+    leaderCommit, err := strconv.ParseInt(leaderCommitValue[0], 10, 0)
+    if err != nil {
+      w.WriteHeader(422)
+      return
+    }
+    // end parsing leaderCommit
+
     // start parsing prevLogTerm
     prevLogTerm, ok := r.Form["prevLogTerm"]
     if !ok || prevLogTerm[0] == "" {
@@ -87,7 +101,7 @@ func NewRPC(sm *StateMachine) (*RPC, error) {
       return
     }
 
-    prevIndex, err := strconv.ParseUint(prevLogIndex[0], 10, 0)
+    prevIndex, err := strconv.ParseInt(prevLogIndex[0], 10, 0)
     if err != nil {
       w.WriteHeader(422)
       return
@@ -99,23 +113,6 @@ func NewRPC(sm *StateMachine) (*RPC, error) {
       <- sm.Storage.C
     }()
 
-    // if the previous index of the leader is superior to
-    // the number of logs stored on this server and it is not the
-    // first log appened then verify if the term entry corresponds
-    // to the indexed log, otherwise tell him to retry
-    // sending logs but with a lower index
-    if prevIndex > sm.Storage.Index {
-      w.WriteHeader(416)
-      return
-    } else if prevIndex != 0 && sm.Storage.Index == 0 {
-      w.WriteHeader(416)
-      return
-    } else if sm.Storage.Index != 0 {
-      if sm.Storage.Logs[prevIndex].Term != prevTerm {
-        w.WriteHeader(416)
-        return
-      }
-    }
     // end parsing term
 
     // start parsing body
@@ -135,14 +132,12 @@ func NewRPC(sm *StateMachine) (*RPC, error) {
           return
         }
 
-        for _, log := range logs {
-          sm.Storage.AppendLog(prevIndex, &log)
-          prevIndex++
+        if len(logs) == 0 {
+          sm.State.C <- struct{}{}
+          sm.State.CurrentTerm = termId
+          <- sm.State.C
         }
 
-        sm.State.C <- struct{}{}
-        sm.State.CurrentTerm = termId
-        <- sm.State.C
 
         fmt.Println(sm.Storage.Logs)
       default:
@@ -150,6 +145,17 @@ func NewRPC(sm *StateMachine) (*RPC, error) {
         return
     }
     // end parsing body
+
+    if leaderCommit > sm.Storage.Index {
+      if leaderCommit > prevIndex {
+        sm.Storage.Index = prevIndex + 1
+      } else {
+        sm.Storage.Index = leaderCommit
+      }
+    }
+
+    fmt.Println("index at:", sm.Storage.Index)
+    fmt.Println("length is:", len(sm.Storage.Logs))
   })
 
   rpc := &RPC{
