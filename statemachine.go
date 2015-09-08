@@ -89,11 +89,19 @@ type Node struct {
   Port uint64
 }
 
+// Cluster struct
+// The node configuration of the server
+// can be retreived with: sm.Cluster.Nodes[sm.MyId]
 type Cluster struct {
+  // Store all the nodes
   Nodes map[string]Node
+
+  // Sync everything
   C chan struct{}
 }
 
+// Add a node to a cluster, the name of the node
+// is the RPCIp:RPCPort
 func (c *Cluster) Add(n Node) (string, bool) {
   c.C <- struct{}{}
   defer func() {
@@ -148,11 +156,6 @@ func (s *StateMachine) Initialize() error {
   if s.Initialized == true {
     err := fmt.Errorf("StateMachine is already initialized.")
 
-    return err
-  }
-
-  if len(s.Cluster.Nodes) < 3 {
-    err := fmt.Errorf("Cannot initialize when cluster size is < 3.")
     return err
   }
 
