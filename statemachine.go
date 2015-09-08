@@ -241,7 +241,7 @@ func NewStateMachine(config *StateMachineConfiguration) (*StateMachine, error) {
   s.State = state
 
 
-  s.On("init::start", func(args ...interface{}) {
+  s.Once("init::start", func(args ...interface{}) {
     var err error
 
     s := args[0].(*StateMachine)
@@ -262,7 +262,7 @@ func NewStateMachine(config *StateMachineConfiguration) (*StateMachine, error) {
     }
   })
 
-  s.On("init::start", func(args ...interface{}) {
+  s.Once("init::start", func(args ...interface{}) {
     var err error
 
     s := args[0].(*StateMachine)

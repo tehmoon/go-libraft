@@ -190,7 +190,14 @@ func (e *Events) ExecSync(name string, args ...interface{}) {
         event.Executed = true
 
         if event.Once == true {
+          // Unlock, unspool, lock
+          // Otherwise we get a deadlock
+          // I know that unspooling could take time because some
+          // other events could be waiting, but I need to create
+          // a lock for each name to avoid global locking.
+          <- e.C
           e.Off(name, event.Callback)
+          e.C <- struct{}{}
         }
       }
     }
