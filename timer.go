@@ -26,6 +26,9 @@ type Timer struct {
   // The timer will be randomized base on Min and Max (in milliSecond)
   Min int
   Max int
+
+  // Sync
+  C chan struct{}
 }
 
 // Basic function that create randomized between two ints
@@ -36,6 +39,11 @@ func Random(min, max int) int {
 
 // Start a timer with the stored configuration in *Timer
 func (t *Timer) Start() bool {
+  t.C <- struct{}{}
+  defer func() {
+    <- t.C
+  }()
+
   // If a timer is already stored, do not run
   if t.Timer != nil {
     return false
@@ -74,6 +82,11 @@ func (t *Timer) Start() bool {
 // }
 // To start the timer all over again
 func (t *Timer) Stop() bool {
+  t.C <- struct{}{}
+  defer func() {
+    <- t.C
+  }()
+
   t.StopChan <- struct{}{}
   stopped := t.Timer.Stop()
 
@@ -88,6 +101,7 @@ func NewTimer(min, max int, cb func()) *Timer {
     Timer: nil,
     ResetChan: make(chan struct{}),
     StopChan: make(chan struct{}),
+    C: make(chan struct{}, 1),
     Min: min,
     Max: max,
   }
