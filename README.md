@@ -27,6 +27,7 @@ ie:
 ## Possible Enhancements
 
 - [ ] Safe Channel between RPCs / TLS or PGP ?
+- [ ] HTTP2 / HTTP1.1 bi-directionnal com WebSocket ?
 - [ ] Fast RPCs / protobuf ?
 - [ ] Embedded Database / RocksDB ?
 
