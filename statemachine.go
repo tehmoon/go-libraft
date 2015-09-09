@@ -133,6 +133,7 @@ type StateMachine struct {
   RPC *RPC
   State *State
   Initialized bool
+  Timer *Timer
 
   Cluster *Cluster
 
@@ -166,6 +167,7 @@ func (s *StateMachine) Initialize() error {
   // Funcs are initialized
   s.Initialized = true
   s.State.Switch(FOLLOWER)
+  s.Timer.Start()
   s.Exec("init::done")
 
   // TODO: catch ERR
@@ -243,6 +245,9 @@ func NewStateMachine(config *StateMachineConfiguration) (*StateMachine, error) {
 
   s.State = state
 
+  s.Timer = NewTimer(150, 300, func() {
+    s.Exec("timeout::elapsed", s)
+  })
 
   s.Once("init::start", func(args ...interface{}) {
     var err error
