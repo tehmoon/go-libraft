@@ -30,6 +30,7 @@ type State struct {
 
   // Channel to sync everyting
   C chan struct{}
+  SyncTerm chan struct{}
 
   *Events
 }
@@ -42,10 +43,17 @@ func (s *State) Is() string {
 // Safely switch from a state to another
 // This should only be called by the Raft package
 func (s *State) Switch(state string) error {
+  s.C <- struct{}{}
+  defer func() {
+    <- s.C
+  }()
+
   // If the state does not change, return
   if state == s.Is() {
     return nil
   }
+
+  old := s.Is()
 
   // Raft cannot be at any state other than FOLLOWER when
   // state is at INIT
@@ -53,13 +61,10 @@ func (s *State) Switch(state string) error {
     return fmt.Errorf("State must be follower when status == INIT")
   }
 
+
   // Checking correct state has argument
   switch state {
     case FOLLOWER, CANDIDATE, LEADER:
-      s.C <- struct{}{}
-      defer func() {
-        <- s.C
-      }()
     default:
       return fmt.Errorf("Only supported operations: FOLLOWER, CANDIDATE or LEADER.")
   }
@@ -77,7 +82,6 @@ func (s *State) Switch(state string) error {
 
   // Apply the status if the case bellow has been
   // correctly executed
-  old := s.Status
   s.Status = state
   s.Exec("state::changed", old, state)
 
@@ -240,6 +244,7 @@ func NewStateMachine(config *StateMachineConfiguration) (*StateMachine, error) {
     VotedFor: "",
     MyId: id,
     C: make(chan struct{}, 1),
+    SyncTerm: make(chan struct{}, 1),
     Events: s.Events,
   }
 
@@ -297,7 +302,9 @@ func NewStateMachine(config *StateMachineConfiguration) (*StateMachine, error) {
     s := args[0].(*StateMachine)
 
     fmt.Println("timeout elapsed!")
-    s.State.Switch(CANDIDATE)
+    if s.State.Is() == FOLLOWER {
+      s.State.Switch(CANDIDATE)
+    }
   })
 
   return s, nil

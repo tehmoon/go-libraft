@@ -47,14 +47,14 @@ func NewRPC(sm *StateMachine) (*RPC, error) {
     statusCode := 200
 
     // Acquire the lock since we'll write and we don't want dirty reads
-    sm.State.C <- struct{}{}
+    sm.State.SyncTerm <- struct{}{}
     defer func() {
       // Send back the Current-Term in the response
       w.Header().Add("X-Current-Term", strconv.FormatUint(sm.State.CurrentTerm, 10))
       w.WriteHeader(statusCode)
 
       // Unlock
-      <- sm.State.C
+      <- sm.State.SyncTerm
     }()
 
     oldTerm := sm.State.CurrentTerm
@@ -133,6 +133,10 @@ func NewRPC(sm *StateMachine) (*RPC, error) {
 
     //// end parsing term
 
+    if sm.State.Is() != FOLLOWER {
+      sm.State.Switch(FOLLOWER)
+    }
+
     // start parsing body
     body, err := ioutil.ReadAll(r.Body)
     if err != nil {
@@ -152,6 +156,12 @@ func NewRPC(sm *StateMachine) (*RPC, error) {
         if len(logs) == 0 && newTerm != sm.State.CurrentTerm {
           sm.State.CurrentTerm = newTerm
           sm.Exec("term::changed", oldTerm, newTerm)
+        }
+
+        if ok := sm.Timer.Stop(); ok {
+          for ok := false; !ok; {
+            ok = sm.Timer.Start();
+          }
         }
       default:
         statusCode = 415
