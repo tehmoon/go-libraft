@@ -14,19 +14,19 @@ import "reflect"
 // removing callbacks will may not be in the order
 // you want to.
 // TODO: keep the global channel for global actions,
-// like adding or removing events, but I should add
-// a local channel to edit or execute events without
-// blocking all the other events.
+// like adding or removing callbacks, but I should add
+// a local channel to edit or execute callbacks without
+// blocking all the other callbacks.
 type Events struct {
-  Maps map[string][]*Event
-  //Callbacks map[string]*struct{
+  Maps map[string][]*Callback
+  //Maps map[string]*struct{
     //C chan struct{}
-
+    //Callbacks []Callback
   //}
   C chan struct{}
 }
 
-type Event struct {
+type Callback struct {
   CallbackFunc CallbackFunc
   Once bool
   Executed bool
@@ -48,23 +48,23 @@ func (e *Events) On(name string, cb CallbackFunc) {
   }()
 
   if cbs, found := e.Maps[name]; found {
-    event := &Event{
+    callback := &Callback{
       CallbackFunc: cb,
       Once: false,
       Executed: false,
     }
 
-    e.Maps[name] = append(cbs, event)
+    e.Maps[name] = append(cbs, callback)
   } else {
-    e.Maps[name] = make([]*Event, 0, 0)
+    e.Maps[name] = make([]*Callback, 0, 0)
 
-    event := &Event{
+    callback := &Callback{
       CallbackFunc: cb,
       Once: false,
       Executed: false,
     }
 
-    e.Maps[name] = append(e.Maps[name], event)
+    e.Maps[name] = append(e.Maps[name], callback)
   }
 }
 
@@ -83,23 +83,23 @@ func (e *Events) Once(name string, cb CallbackFunc) {
   }()
 
   if cbs, found := e.Maps[name]; found {
-    event := &Event{
+    callback := &Callback{
       CallbackFunc: cb,
       Once: true,
       Executed: false,
     }
 
-    e.Maps[name] = append(cbs, event)
+    e.Maps[name] = append(cbs, callback)
   } else {
-    e.Maps[name] = make([]*Event, 0, 0)
+    e.Maps[name] = make([]*Callback, 0, 0)
 
-    event := &Event{
+    callback := &Callback{
       CallbackFunc: cb,
       Once: true,
       Executed: false,
     }
 
-    e.Maps[name] = append(e.Maps[name], event)
+    e.Maps[name] = append(e.Maps[name], callback)
   }
 }
 
@@ -116,13 +116,13 @@ func (e *Events) Off(name string, cb CallbackFunc) {
     <- e.C
   }()
 
-  if cbs, found := e.Maps[name]; found {
-    length := len(cbs)
+  if callbacks, found := e.Maps[name]; found {
+    length := len(callbacks)
 
     foundAt := -1
 
-    for i, event := range cbs{
-      if reflect.ValueOf(event.CallbackFunc).Pointer() == reflect.ValueOf(cb).Pointer() {
+    for i, callback := range callbacks {
+      if reflect.ValueOf(callback.CallbackFunc).Pointer() == reflect.ValueOf(cb).Pointer() {
         foundAt = i
         break
       }
@@ -132,17 +132,17 @@ func (e *Events) Off(name string, cb CallbackFunc) {
       return
     }
 
-    tmp := make([]*Event, length -1)
+    tmp := make([]*Callback, length -1)
 
     index := 0
 
     for i := 0; i < length; i++ {
       // Compare two pointer value
-      if reflect.ValueOf(cbs[i].CallbackFunc).Pointer() == reflect.ValueOf(cb).Pointer() {
+      if reflect.ValueOf(callbacks[i].CallbackFunc).Pointer() == reflect.ValueOf(cb).Pointer() {
         continue
       }
 
-      tmp[index] = cbs[i]
+      tmp[index] = callbacks[i]
       index = index + 1
     }
 
@@ -161,14 +161,14 @@ func (e *Events) Exec(name string, args ...interface{}) {
     length := len(cbs)
 
     for i := 0; i < length; i++ {
-      go func(event *Event) {
-        if event.Once == true  && event.Executed == true {
+      go func(callback *Callback) {
+        if callback.Once == true  && callback.Executed == true {
         } else {
-          event.CallbackFunc(args...)
-          event.Executed = true
+          callback.CallbackFunc(args...)
+          callback.Executed = true
 
-          if event.Once == true {
-            e.Off(name, event.CallbackFunc)
+          if callback.Once == true {
+            e.Off(name, callback.CallbackFunc)
           }
         }
       }(cbs[i])
@@ -183,25 +183,25 @@ func (e *Events) ExecSync(name string, args ...interface{}) {
     <- e.C
   }()
 
-  if cbs, found := e.Maps[name]; found {
-    length := len(cbs)
+  if callbacks, found := e.Maps[name]; found {
+    length := len(callbacks)
 
     for i := 0; i < length; i++ {
-      event := cbs[i]
+      callback := callbacks[i]
 
-      if event.Once == true  && event.Executed == true {
+      if callback.Once == true  && callback.Executed == true {
       } else {
-        event.CallbackFunc(args...)
-        event.Executed = true
+        callback.CallbackFunc(args...)
+        callback.Executed = true
 
-        if event.Once == true {
+        if callback.Once == true {
           // Unlock, unspool, lock
           // Otherwise we get a deadlock
           // I know that unspooling could take time because some
-          // other events could be waiting, but I need to create
+          // other callbacks could be waiting, but I need to create
           // a lock for each name to avoid global locking.
           <- e.C
-          e.Off(name, event.CallbackFunc)
+          e.Off(name, callback.CallbackFunc)
           e.C <- struct{}{}
         }
       }
@@ -212,7 +212,7 @@ func (e *Events) ExecSync(name string, args ...interface{}) {
 // Creates a callback array
 func NewEvents() *Events {
   e := &Events{
-    Maps: make(map[string][]*Event, 0),
+    Maps: make(map[string][]*Callback, 0),
     C: make(chan struct{}, 1),
   }
 
