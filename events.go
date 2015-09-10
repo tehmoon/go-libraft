@@ -18,12 +18,15 @@ import "reflect"
 // a local channel to edit or execute callbacks without
 // blocking all the other callbacks.
 type Events struct {
-  Names map[string][]*Callback
-  //Names map[string]*struct{
-    //C chan struct{}
-    //Callbacks []Callback
-  //}
+  //Names map[string][]*Callback
+  Names map[string]*Event
+
   C chan struct{}
+}
+
+type Event struct{
+  C chan struct{}
+  Callbacks []*Callback
 }
 
 type Callback struct {
@@ -47,16 +50,19 @@ func (e *Events) On(name string, cb CallbackFunc) {
     <- e.C
   }()
 
-  if callbacks, found := e.Names[name]; found {
+  if event, found := e.Names[name]; found {
     callback := &Callback{
       CallbackFunc: cb,
       Once: false,
       Executed: false,
     }
 
-    e.Names[name] = append(callbacks, callback)
+    event.Callbacks = append(event.Callbacks, callback)
   } else {
-    e.Names[name] = make([]*Callback, 0, 0)
+    event := &Event{
+      Callbacks: make([]*Callback, 0, 0),
+      C: make(chan struct{}, 1),
+    }
 
     callback := &Callback{
       CallbackFunc: cb,
@@ -64,7 +70,9 @@ func (e *Events) On(name string, cb CallbackFunc) {
       Executed: false,
     }
 
-    e.Names[name] = append(e.Names[name], callback)
+    event.Callbacks = append(event.Callbacks, callback)
+
+    e.Names[name] = event
   }
 }
 
@@ -82,16 +90,19 @@ func (e *Events) Once(name string, cb CallbackFunc) {
     <- e.C
   }()
 
-  if callbacks, found := e.Names[name]; found {
+  if event, found := e.Names[name]; found {
     callback := &Callback{
       CallbackFunc: cb,
       Once: true,
       Executed: false,
     }
 
-    e.Names[name] = append(callbacks, callback)
+    event.Callbacks = append(event.Callbacks, callback)
   } else {
-    e.Names[name] = make([]*Callback, 0, 0)
+    event := &Event{
+      Callbacks: make([]*Callback, 0, 0),
+      C: make(chan struct{}, 1),
+    }
 
     callback := &Callback{
       CallbackFunc: cb,
@@ -99,7 +110,9 @@ func (e *Events) Once(name string, cb CallbackFunc) {
       Executed: false,
     }
 
-    e.Names[name] = append(e.Names[name], callback)
+    event.Callbacks = append(event.Callbacks, callback)
+
+    e.Names[name] = event
   }
 }
 
@@ -116,12 +129,12 @@ func (e *Events) Off(name string, cb CallbackFunc) {
     <- e.C
   }()
 
-  if callbacks, found := e.Names[name]; found {
-    length := len(callbacks)
+  if event, found := e.Names[name]; found {
+    length := len(event.Callbacks)
 
     foundAt := -1
 
-    for i, callback := range callbacks {
+    for i, callback := range event.Callbacks {
       if reflect.ValueOf(callback.CallbackFunc).Pointer() == reflect.ValueOf(cb).Pointer() {
         foundAt = i
         break
@@ -138,15 +151,15 @@ func (e *Events) Off(name string, cb CallbackFunc) {
 
     for i := 0; i < length; i++ {
       // Compare two pointer value
-      if reflect.ValueOf(callbacks[i].CallbackFunc).Pointer() == reflect.ValueOf(cb).Pointer() {
+      if reflect.ValueOf(event.Callbacks[i].CallbackFunc).Pointer() == reflect.ValueOf(cb).Pointer() {
         continue
       }
 
-      tmp[index] = callbacks[i]
+      tmp[index] = event.Callbacks[i]
       index = index + 1
     }
 
-    e.Names[name] = tmp
+    e.Names[name].Callbacks = tmp
   }
 }
 
@@ -157,8 +170,8 @@ func (e *Events) Exec(name string, args ...interface{}) {
     <- e.C
   }()
 
-  if callbacks, found := e.Names[name]; found {
-    length := len(callbacks)
+  if event, found := e.Names[name]; found {
+    length := len(event.Callbacks)
 
     for i := 0; i < length; i++ {
       go func(callback *Callback) {
@@ -168,10 +181,11 @@ func (e *Events) Exec(name string, args ...interface{}) {
           callback.Executed = true
 
           if callback.Once == true {
-            e.Off(name, callback.CallbackFunc)
+            // Async delete of the unused CallbackFun
+            go e.Off(name, callback.CallbackFunc)
           }
         }
-      }(callbacks[i])
+      }(event.Callbacks[i])
     }
   }
 }
@@ -183,11 +197,11 @@ func (e *Events) ExecSync(name string, args ...interface{}) {
     <- e.C
   }()
 
-  if callbacks, found := e.Names[name]; found {
-    length := len(callbacks)
+  if event, found := e.Names[name]; found {
+    length := len(event.Callbacks)
 
     for i := 0; i < length; i++ {
-      callback := callbacks[i]
+      callback := event.Callbacks[i]
 
       if callback.Once == true  && callback.Executed == true {
       } else {
@@ -195,14 +209,8 @@ func (e *Events) ExecSync(name string, args ...interface{}) {
         callback.Executed = true
 
         if callback.Once == true {
-          // Unlock, unspool, lock
-          // Otherwise we get a deadlock
-          // I know that unspooling could take time because some
-          // other callbacks could be waiting, but I need to create
-          // a lock for each name to avoid global locking.
-          <- e.C
-          e.Off(name, callback.CallbackFunc)
-          e.C <- struct{}{}
+          // Async delete of the unused CallbackFun
+          go e.Off(name, callback.CallbackFunc)
         }
       }
     }
@@ -212,7 +220,7 @@ func (e *Events) ExecSync(name string, args ...interface{}) {
 // Creates a callback array
 func NewEvents() *Events {
   e := &Events{
-    Names: make(map[string][]*Callback, 0),
+    Names: make(map[string]*Event, 0),
     C: make(chan struct{}, 1),
   }
 
