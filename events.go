@@ -47,14 +47,14 @@ func (e *Events) On(name string, cb CallbackFunc) {
     <- e.C
   }()
 
-  if cbs, found := e.Names[name]; found {
+  if callbacks, found := e.Names[name]; found {
     callback := &Callback{
       CallbackFunc: cb,
       Once: false,
       Executed: false,
     }
 
-    e.Names[name] = append(cbs, callback)
+    e.Names[name] = append(callbacks, callback)
   } else {
     e.Names[name] = make([]*Callback, 0, 0)
 
@@ -82,14 +82,14 @@ func (e *Events) Once(name string, cb CallbackFunc) {
     <- e.C
   }()
 
-  if cbs, found := e.Names[name]; found {
+  if callbacks, found := e.Names[name]; found {
     callback := &Callback{
       CallbackFunc: cb,
       Once: true,
       Executed: false,
     }
 
-    e.Names[name] = append(cbs, callback)
+    e.Names[name] = append(callbacks, callback)
   } else {
     e.Names[name] = make([]*Callback, 0, 0)
 
@@ -157,8 +157,8 @@ func (e *Events) Exec(name string, args ...interface{}) {
     <- e.C
   }()
 
-  if cbs, found := e.Names[name]; found {
-    length := len(cbs)
+  if callbacks, found := e.Names[name]; found {
+    length := len(callbacks)
 
     for i := 0; i < length; i++ {
       go func(callback *Callback) {
@@ -171,7 +171,7 @@ func (e *Events) Exec(name string, args ...interface{}) {
             e.Off(name, callback.CallbackFunc)
           }
         }
-      }(cbs[i])
+      }(callbacks[i])
     }
   }
 }
