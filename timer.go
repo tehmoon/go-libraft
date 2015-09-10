@@ -87,12 +87,15 @@ func (t *Timer) Stop() bool {
     <- t.C
   }()
 
-  t.StopChan <- struct{}{}
-  stopped := t.Timer.Stop()
+  if t.Timer != nil {
+    t.StopChan <- struct{}{}
+    stopped := t.Timer.Stop()
+    t.Timer = nil
 
-  t.Timer = nil
+    return stopped
+  }
 
-  return stopped
+  return false
 }
 
 // Create a newTimer
