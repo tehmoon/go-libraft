@@ -18,8 +18,8 @@ import "reflect"
 // a local channel to edit or execute callbacks without
 // blocking all the other callbacks.
 type Events struct {
-  Event map[string][]*Callback
-  //Event map[string]*struct{
+  Names map[string][]*Callback
+  //Names map[string]*struct{
     //C chan struct{}
     //Callbacks []Callback
   //}
@@ -47,16 +47,16 @@ func (e *Events) On(name string, cb CallbackFunc) {
     <- e.C
   }()
 
-  if cbs, found := e.Event[name]; found {
+  if cbs, found := e.Names[name]; found {
     callback := &Callback{
       CallbackFunc: cb,
       Once: false,
       Executed: false,
     }
 
-    e.Event[name] = append(cbs, callback)
+    e.Names[name] = append(cbs, callback)
   } else {
-    e.Event[name] = make([]*Callback, 0, 0)
+    e.Names[name] = make([]*Callback, 0, 0)
 
     callback := &Callback{
       CallbackFunc: cb,
@@ -64,7 +64,7 @@ func (e *Events) On(name string, cb CallbackFunc) {
       Executed: false,
     }
 
-    e.Event[name] = append(e.Event[name], callback)
+    e.Names[name] = append(e.Names[name], callback)
   }
 }
 
@@ -82,16 +82,16 @@ func (e *Events) Once(name string, cb CallbackFunc) {
     <- e.C
   }()
 
-  if cbs, found := e.Event[name]; found {
+  if cbs, found := e.Names[name]; found {
     callback := &Callback{
       CallbackFunc: cb,
       Once: true,
       Executed: false,
     }
 
-    e.Event[name] = append(cbs, callback)
+    e.Names[name] = append(cbs, callback)
   } else {
-    e.Event[name] = make([]*Callback, 0, 0)
+    e.Names[name] = make([]*Callback, 0, 0)
 
     callback := &Callback{
       CallbackFunc: cb,
@@ -99,7 +99,7 @@ func (e *Events) Once(name string, cb CallbackFunc) {
       Executed: false,
     }
 
-    e.Event[name] = append(e.Event[name], callback)
+    e.Names[name] = append(e.Names[name], callback)
   }
 }
 
@@ -116,7 +116,7 @@ func (e *Events) Off(name string, cb CallbackFunc) {
     <- e.C
   }()
 
-  if callbacks, found := e.Event[name]; found {
+  if callbacks, found := e.Names[name]; found {
     length := len(callbacks)
 
     foundAt := -1
@@ -146,7 +146,7 @@ func (e *Events) Off(name string, cb CallbackFunc) {
       index = index + 1
     }
 
-    e.Event[name] = tmp
+    e.Names[name] = tmp
   }
 }
 
@@ -157,7 +157,7 @@ func (e *Events) Exec(name string, args ...interface{}) {
     <- e.C
   }()
 
-  if cbs, found := e.Event[name]; found {
+  if cbs, found := e.Names[name]; found {
     length := len(cbs)
 
     for i := 0; i < length; i++ {
@@ -183,7 +183,7 @@ func (e *Events) ExecSync(name string, args ...interface{}) {
     <- e.C
   }()
 
-  if callbacks, found := e.Event[name]; found {
+  if callbacks, found := e.Names[name]; found {
     length := len(callbacks)
 
     for i := 0; i < length; i++ {
@@ -212,7 +212,7 @@ func (e *Events) ExecSync(name string, args ...interface{}) {
 // Creates a callback array
 func NewEvents() *Events {
   e := &Events{
-    Event: make(map[string][]*Callback, 0),
+    Names: make(map[string][]*Callback, 0),
     C: make(chan struct{}, 1),
   }
 
