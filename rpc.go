@@ -44,9 +44,10 @@ func (rpc *RPC) StartElection() {
   sm.State.CurrentTerm = newTerm
   sm.Exec("term::changed", oldTerm, newTerm)
 
-  sm.Timer.Stop();
-  for ok := false; !ok; {
-    ok = sm.Timer.Start()
+  if ok := sm.Timer.Stop(); ok {
+    for ok := false; !ok; {
+      ok = sm.Timer.Start()
+    }
   }
 
   sm.State.Switch(LEADER)
