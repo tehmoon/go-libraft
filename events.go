@@ -46,11 +46,16 @@ type CallbackFunc func(args ...interface{})
 // the function will never be removable.
 func (e *Events) On(name string, cb CallbackFunc) {
   e.C <- struct{}{}
-  defer func() {
-    <- e.C
-  }()
 
   if event, found := e.Names[name]; found {
+    // Acquire the lock of the event
+    // and unlock the general lock
+    event.C <- struct{}{}
+    <- e.C
+    defer func() {
+      <- event.C
+    }()
+
     callback := &Callback{
       CallbackFunc: cb,
       Once: false,
@@ -73,6 +78,8 @@ func (e *Events) On(name string, cb CallbackFunc) {
     event.Callbacks = append(event.Callbacks, callback)
 
     e.Names[name] = event
+
+    <- e.C
   }
 }
 
@@ -86,11 +93,16 @@ func (e *Events) On(name string, cb CallbackFunc) {
 // the function will never be removable.
 func (e *Events) Once(name string, cb CallbackFunc) {
   e.C <- struct{}{}
-  defer func() {
-    <- e.C
-  }()
 
   if event, found := e.Names[name]; found {
+    // Acquire the lock of the event
+    // and unlock the general lock
+    event.C <- struct{}{}
+    <- e.C
+    defer func() {
+      <- event.C
+    }()
+
     callback := &Callback{
       CallbackFunc: cb,
       Once: true,
@@ -113,6 +125,8 @@ func (e *Events) Once(name string, cb CallbackFunc) {
     event.Callbacks = append(event.Callbacks, callback)
 
     e.Names[name] = event
+
+    <- e.C
   }
 }
 
@@ -125,11 +139,16 @@ func (e *Events) Once(name string, cb CallbackFunc) {
 // the function will never be removable.
 func (e *Events) Off(name string, cb CallbackFunc) {
   e.C <- struct{}{}
-  defer func() {
-    <- e.C
-  }()
 
   if event, found := e.Names[name]; found {
+    // Acquire the lock of the event
+    // and unlock the general lock
+    event.C <- struct{}{}
+    <- e.C
+    defer func() {
+      <- event.C
+    }()
+
     length := len(event.Callbacks)
 
     foundAt := -1
@@ -160,17 +179,24 @@ func (e *Events) Off(name string, cb CallbackFunc) {
     }
 
     e.Names[name].Callbacks = tmp
+  } else {
+    <- e.C
   }
 }
 
 // Execute async all the callbacks that was registered with .On
 func (e *Events) Exec(name string, args ...interface{}) {
   e.C <- struct{}{}
-  defer func() {
-    <- e.C
-  }()
 
   if event, found := e.Names[name]; found {
+    // Acquire the lock of the event
+    // and unlock the general lock
+    event.C <- struct{}{}
+    <- e.C
+    defer func() {
+      <- event.C
+    }()
+
     length := len(event.Callbacks)
 
     for i := 0; i < length; i++ {
@@ -187,17 +213,24 @@ func (e *Events) Exec(name string, args ...interface{}) {
         }
       }(event.Callbacks[i])
     }
+  } else {
+    <- e.C
   }
 }
 
 // Execute sync all the callbacks that was registered with .On
 func (e *Events) ExecSync(name string, args ...interface{}) {
   e.C <- struct{}{}
-  defer func() {
-    <- e.C
-  }()
 
   if event, found := e.Names[name]; found {
+    // Acquire the lock of the event
+    // and unlock the general lock
+    event.C <- struct{}{}
+    <- e.C
+    defer func() {
+      <- event.C
+    }()
+
     length := len(event.Callbacks)
 
     for i := 0; i < length; i++ {
@@ -214,6 +247,8 @@ func (e *Events) ExecSync(name string, args ...interface{}) {
         }
       }
     }
+  } else {
+    <- e.C
   }
 }
 
