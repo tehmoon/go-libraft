@@ -102,6 +102,9 @@ type Cluster struct {
 
   // Sync everything
   C chan struct{}
+
+  // Hardcode the majority of the cluster
+  Majority uint
 }
 
 // Add a node to a cluster, the name of the node
@@ -119,6 +122,9 @@ func (c *Cluster) Add(n Node) (string, bool) {
   }
 
   c.Nodes[name] = n
+
+  // Formula to compute majority
+  c.Majority = uint((len(c.Nodes) / 2) + 1)
 
   return name, true
 }
@@ -251,7 +257,7 @@ func NewStateMachine(config *StateMachineConfiguration) (*StateMachine, error) {
   s.State = state
 
   s.Timer = NewTimer(150, 300, func() {
-    s.Exec("timeout::elapsed", s)
+    s.ExecSync("timeout::elapsed", s)
   })
 
   s.Once("init::start", func(args ...interface{}) {
@@ -304,6 +310,7 @@ func NewStateMachine(config *StateMachineConfiguration) (*StateMachine, error) {
     fmt.Println("timeout elapsed!")
     if s.State.Is() == FOLLOWER {
       s.State.Switch(CANDIDATE)
+      s.RPC.StartElection()
     }
   })
 

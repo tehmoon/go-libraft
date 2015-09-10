@@ -12,6 +12,7 @@ import (
 // functions
 type RPC struct {
   Server *http.Server
+  StateMachine *StateMachine
 }
 
 // Start the RPC server
@@ -23,6 +24,33 @@ func (rpc *RPC) Start() error {
   err := rpc.Server.ListenAndServe()
 
   return err
+}
+
+func (rpc *RPC) StartElection() {
+  sm := rpc.StateMachine
+
+  if sm.State.Is() != CANDIDATE {
+    return
+  }
+
+  sm.State.SyncTerm <- struct{}{}
+  defer func() {
+    <- sm.State.SyncTerm
+  }()
+
+  oldTerm := sm.State.CurrentTerm
+  newTerm := sm.State.CurrentTerm + 1
+
+  sm.State.CurrentTerm = newTerm
+  sm.Exec("term::changed", oldTerm, newTerm)
+
+  sm.Timer.Stop();
+  for ok := false; !ok; {
+    ok = sm.Timer.Start()
+  }
+
+  sm.State.Switch(LEADER)
+  sm.Timer.Stop()
 }
 
 // Create RPC connection
@@ -133,16 +161,13 @@ func NewRPC(sm *StateMachine) (*RPC, error) {
 
     //// end parsing term
 
-    if sm.State.Is() != FOLLOWER {
-      sm.State.Switch(FOLLOWER)
-    }
-
     // start parsing body
     body, err := ioutil.ReadAll(r.Body)
     if err != nil {
       statusCode = 400
       return
     }
+
     switch contentType := r.Header.Get("Content-Type"); contentType {
       case "application/json":
         var logs Logs
@@ -153,15 +178,19 @@ func NewRPC(sm *StateMachine) (*RPC, error) {
           return
         }
 
+        if sm.State.Is() != FOLLOWER {
+          sm.State.Switch(FOLLOWER)
+        }
+
         if len(logs) == 0 && newTerm != sm.State.CurrentTerm {
           sm.State.CurrentTerm = newTerm
           sm.Exec("term::changed", oldTerm, newTerm)
         }
 
-        if ok := sm.Timer.Stop(); ok {
-          for ok := false; !ok; {
-            ok = sm.Timer.Start();
-          }
+        // TODO: stop the timer after added all logs
+        sm.Timer.Stop();
+        for ok := false; !ok; {
+          ok = sm.Timer.Start()
         }
       default:
         statusCode = 415
@@ -173,6 +202,7 @@ func NewRPC(sm *StateMachine) (*RPC, error) {
 
   rpc := &RPC{
     Server: server,
+    StateMachine: sm,
   }
 
   return rpc, nil
