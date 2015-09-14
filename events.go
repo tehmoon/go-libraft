@@ -1,6 +1,7 @@
 package raft
 
 import "reflect"
+//import "fmt"
 
 // Callback list    args
 // init::done
@@ -46,14 +47,18 @@ type CallbackFunc func(args ...interface{})
 // the function will never be removable.
 func (e *Events) On(name string, cb CallbackFunc) {
   e.C <- struct{}{}
+    //fmt.Println("event: ", name, " global locked in on")
 
   if event, found := e.Names[name]; found {
     // Acquire the lock of the event
     // and unlock the general lock
     event.C <- struct{}{}
+    //fmt.Println("event: ", name, " locked in on")
     <- e.C
+    //fmt.Println("event: ", name, " global unlocked in on")
     defer func() {
       <- event.C
+      //fmt.Println("event: ", name, " unlocked in on")
     }()
 
     callback := &Callback{
@@ -80,6 +85,7 @@ func (e *Events) On(name string, cb CallbackFunc) {
     e.Names[name] = event
 
     <- e.C
+    //fmt.Println("event: ", name, " global unlocked in on")
   }
 }
 
@@ -93,14 +99,18 @@ func (e *Events) On(name string, cb CallbackFunc) {
 // the function will never be removable.
 func (e *Events) Once(name string, cb CallbackFunc) {
   e.C <- struct{}{}
+  //fmt.Println("event: ", name, " global locked in once")
 
   if event, found := e.Names[name]; found {
     // Acquire the lock of the event
     // and unlock the general lock
     event.C <- struct{}{}
+    //fmt.Println("event: ", name, " locked in once")
     <- e.C
+    //fmt.Println("event: ", name, " global unlocked in once")
     defer func() {
       <- event.C
+      //fmt.Println("event: ", name, " unlocked in once")
     }()
 
     callback := &Callback{
@@ -127,6 +137,7 @@ func (e *Events) Once(name string, cb CallbackFunc) {
     e.Names[name] = event
 
     <- e.C
+    //fmt.Println("event: ", name, " global unlocked in once")
   }
 }
 
@@ -139,14 +150,18 @@ func (e *Events) Once(name string, cb CallbackFunc) {
 // the function will never be removable.
 func (e *Events) Off(name string, cb CallbackFunc) {
   e.C <- struct{}{}
+  //fmt.Println("event: ", name, " global locked in off")
 
   if event, found := e.Names[name]; found {
     // Acquire the lock of the event
     // and unlock the general lock
     event.C <- struct{}{}
+    //fmt.Println("event: ", name, " locked in off")
     <- e.C
+    //fmt.Println("event: ", name, " global unlocked in off")
     defer func() {
       <- event.C
+      //fmt.Println("event: ", name, " unlocked in off")
     }()
 
     length := len(event.Callbacks)
@@ -181,6 +196,7 @@ func (e *Events) Off(name string, cb CallbackFunc) {
     e.Names[name].Callbacks = tmp
   } else {
     <- e.C
+    //fmt.Println("event: ", name, " unlocked in off")
   }
 }
 
@@ -221,14 +237,18 @@ func (e *Events) Exec(name string, args ...interface{}) {
 // Execute sync all the callbacks that was registered with .On
 func (e *Events) ExecSync(name string, args ...interface{}) {
   e.C <- struct{}{}
+  //fmt.Println("event: ", name, " global locked in execync")
 
   if event, found := e.Names[name]; found {
     // Acquire the lock of the event
     // and unlock the general lock
     event.C <- struct{}{}
+    //fmt.Println("event: ", name, " locked in execync")
     <- e.C
+    //fmt.Println("event: ", name, " global unlocked in execync")
     defer func() {
       <- event.C
+      //fmt.Println("event: ", name, " unlocked in execync")
     }()
 
     length := len(event.Callbacks)
@@ -249,6 +269,7 @@ func (e *Events) ExecSync(name string, args ...interface{}) {
     }
   } else {
     <- e.C
+    //fmt.Println("event: ", name, " global unlocked in execync")
   }
 }
 
