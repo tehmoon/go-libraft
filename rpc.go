@@ -3,9 +3,12 @@ package raft
 import (
   "net/http"
   "fmt"
+  "time"
   "io/ioutil"
   "strconv"
   "encoding/json"
+  "net/url"
+  "bytes"
 )
 
 // Used to store any field to interact with the RPC
@@ -38,20 +41,87 @@ func (rpc *RPC) StartElection() {
     <- sm.State.SyncTerm
   }()
 
+  sm.Timer.Stop();
+
   oldTerm := sm.State.CurrentTerm
   newTerm := sm.State.CurrentTerm + 1
 
   sm.State.CurrentTerm = newTerm
   sm.Exec("term::changed", oldTerm, newTerm)
 
-  if ok := sm.Timer.Stop(); ok {
-    for ok := false; !ok; {
-      ok = sm.Timer.Start()
+  sm.State.VotedFor = sm.State.MyId
+
+  timer := time.NewTimer(300 * time.Millisecond)
+
+  done := make(chan struct{}, 0)
+  go func() {
+    for nodeName, _ := range sm.Cluster.Nodes {
+      if nodeName == sm.State.MyId {
+        continue
+      }
+
+      client := &http.Client{}
+      form := url.Values{}
+      form.Set("term", strconv.FormatUint(sm.State.CurrentTerm, 10))
+      form.Set("candidateId", sm.State.MyId)
+      req, err := http.NewRequest("POST", fmt.Sprintf("http://%s/request-vote", nodeName), bytes.NewBufferString(form.Encode()))
+      if err != nil {
+        return
+      }
+      req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+      resp, err := client.Do(req)
+      if err != nil {
+        return
+      }
+
+      switch statusCode := resp.StatusCode; statusCode {
+        case 200:
+          done <- struct{}{}
+        default:
+          return
+      }
+    }
+  }()
+
+  LOOP: for {
+    select {
+      case <- timer.C:
+        timer.Stop()
+        return
+      case <- done:
+        break LOOP
     }
   }
 
-  sm.State.Switch(LEADER)
   sm.Timer.Stop()
+  sm.State.Switch(LEADER)
+  go func() {
+    defer func() {
+      sm.Timer.Start()
+    }()
+
+    for state := sm.State.Is(); state == LEADER; state = sm.State.Is() {
+      for nodeName, _ := range sm.Cluster.Nodes {
+        if nodeName == sm.State.MyId {
+          continue
+        }
+
+        client := &http.Client{}
+        form := url.Values{}
+        form.Set("term", strconv.FormatUint(sm.State.CurrentTerm, 10))
+        req, err := http.NewRequest("POST", fmt.Sprintf("http://%s/append-entry?%s", nodeName, form.Encode()), bytes.NewBufferString("[]"))
+        if err != nil {
+          return
+        }
+        req.Header.Add("Content-Type", "application/json")
+        _, err = client.Do(req)
+        if err != nil {
+          return
+        }
+      }
+      <- time.Tick(50 * time.Millisecond)
+    }
+  }()
 }
 
 // Create RPC connection
@@ -69,7 +139,7 @@ func NewRPC(sm *StateMachine) (*RPC, error) {
   mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
     fmt.Fprintf(w, "Hello World!")
   })
-  mux.HandleFunc("/appendEntry", func(w http.ResponseWriter, r *http.Request) {
+  mux.HandleFunc("/append-entry", func(w http.ResponseWriter, r *http.Request) {
     // Declare a variable that will be used to be the statusCode of the response
     // because WriteHeader actually writes header, it is not possible to play
     // with the header in a defer function's call
@@ -160,7 +230,7 @@ func NewRPC(sm *StateMachine) (*RPC, error) {
       //<- sm.Storage.C
     //}()
 
-    //// end parsing term
+    //// end parsing prevLogTerm
 
     // start parsing body
     body, err := ioutil.ReadAll(r.Body)
@@ -198,6 +268,89 @@ func NewRPC(sm *StateMachine) (*RPC, error) {
         return
     }
     // end parsing body
+
+  })
+
+  mux.HandleFunc("/request-vote", func(w http.ResponseWriter, r *http.Request) {
+    // Declare a variable that will be used to be the statusCode of the response
+    // because WriteHeader actually writes header, it is not possible to play
+    // with the header in a defer function's call
+    statusCode := 200
+
+    // Acquire the lock since we'll write and we don't want dirty reads
+    sm.State.SyncTerm <- struct{}{}
+    defer func() {
+      // Send back the Current-Term in the response
+      w.Header().Add("X-Current-Term", strconv.FormatUint(sm.State.CurrentTerm, 10))
+      w.WriteHeader(statusCode)
+
+      // Unlock
+      <- sm.State.SyncTerm
+    }()
+
+    err := r.ParseForm()
+    if err != nil {
+      statusCode = 422
+      return
+    }
+
+
+    // start parsing term
+    term, ok := r.Form["term"]
+    if !ok || term[0] == "" {
+      statusCode = 422
+      return
+    }
+
+    newTerm, err := strconv.ParseUint(term[0], 10, 0)
+    if err != nil {
+      statusCode = 422
+      return
+    }
+
+    if newTerm < sm.State.CurrentTerm {
+      statusCode = 422
+      return
+    }
+    // end parsing term
+
+    // start parsing candidateId
+    candidateId, ok := r.Form["candidateId"]
+    if !ok || candidateId[0] == "" {
+      statusCode = 422
+      return
+    }
+
+    candidate := candidateId[0]
+
+    // If the name of the candidate cannot be found in the
+    // cluster configuration then tell him to gtfo
+    if ok := sm.Cluster. Find(candidate); ok == false {
+      statusCode = 422
+      return
+    }
+
+    // If the candidate's term is the same as the CurrentTerm
+    // We need to check if VotedFor is not null AND VotedFor is not the same candidate's ID
+    // Otherwise since there is only one VotedFor per term and at start up the VotedFor is null
+    // respond to false.
+    fmt.Println("receive vote: ", r.Form, "votedFor :", sm.State.VotedFor, "myterm :", sm.State.CurrentTerm)
+    if newTerm == sm.State.CurrentTerm {
+      if sm.State.VotedFor != "" && sm.State.VotedFor != candidate {
+        statusCode = 422
+        return
+      }
+    }
+    // end parsing candidateId
+
+    // if Voted yes, convert to follower and vote for him
+    if sm.State.Is() != FOLLOWER {
+      sm.State.Switch(FOLLOWER)
+      sm.Timer.Start()
+    }
+
+    sm.State.CurrentTerm = newTerm
+    sm.State.VotedFor = candidate
 
   })
 
