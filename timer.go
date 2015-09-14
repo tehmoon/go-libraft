@@ -33,7 +33,6 @@ type Timer struct {
 
 // Basic function that create randomized between two ints
 func Random(min, max int) int {
-  // TODO: add more entropy ?
   return rand.Intn(max - min) + min
 }
 
@@ -49,7 +48,8 @@ func (t *Timer) Start() bool {
     return false
   }
 
-  sleepFor := time.Duration(Random(t.Min, t.Max)) * time.Millisecond
+  random := Random(t.Min, t.Max)
+  sleepFor := time.Duration(random) * time.Millisecond
   t.Timer = time.AfterFunc(sleepFor, t.Callback)
 
   // Launch the goroutine which will handle the reset of the timer.
