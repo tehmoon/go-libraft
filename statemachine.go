@@ -107,6 +107,12 @@ type Cluster struct {
   Majority uint
 }
 
+func (c *Cluster) Find(name string) bool {
+  _, found := c.Nodes[name]
+
+  return found
+}
+
 // Add a node to a cluster, the name of the node
 // is the RPCIp:RPCPort
 func (c *Cluster) Add(n Node) (string, bool) {
@@ -256,7 +262,7 @@ func NewStateMachine(config *StateMachineConfiguration) (*StateMachine, error) {
 
   s.State = state
 
-  s.Timer = NewTimer(150, 300, func() {
+  s.Timer = NewTimer(150, 2000, func() {
     s.ExecSync("timeout::elapsed", s)
   })
 
@@ -310,6 +316,9 @@ func NewStateMachine(config *StateMachineConfiguration) (*StateMachine, error) {
     fmt.Println("timeout elapsed!")
     if s.State.Is() == FOLLOWER {
       s.State.Switch(CANDIDATE)
+      s.RPC.StartElection()
+    }
+    if s.State.Is() == CANDIDATE {
       s.RPC.StartElection()
     }
   })
