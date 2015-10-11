@@ -44,6 +44,7 @@ func (s *State) Is() string {
 // This should only be called by the Raft package
 func (s *State) Switch(state string) error {
   s.C <- struct{}{}
+
   defer func() {
     <- s.C
   }()
@@ -73,11 +74,11 @@ func (s *State) Switch(state string) error {
   // Call the function in the cases
   switch state {
     case FOLLOWER:
-      <- time.Tick(100 * time.Millisecond)
+      <- time.Tick(175 * time.Millisecond)
     case CANDIDATE:
-      <- time.Tick(300 * time.Millisecond)
+      <- time.Tick(175 * time.Millisecond)
     case LEADER:
-      <- time.Tick(500 * time.Millisecond)
+      <- time.Tick(175 * time.Millisecond)
   }
 
   // Apply the status if the case bellow has been
@@ -262,7 +263,7 @@ func NewStateMachine(config *StateMachineConfiguration) (*StateMachine, error) {
 
   s.State = state
 
-  s.Timer = NewTimer(150, 2000, func() {
+  s.Timer = NewTimer(150, 300, func() {
     s.ExecSync("timeout::elapsed", s)
   })
 
