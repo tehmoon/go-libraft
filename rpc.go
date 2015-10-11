@@ -54,7 +54,20 @@ func (rpc *RPC) StartElection() {
 
   timer := time.NewTimer(300 * time.Millisecond)
 
+  addOkNode := make(chan struct{}, len(sm.Cluster.Nodes))
+  // we start at one because we implicitly count this statemachine
+  okNode := 1
   done := make(chan struct{}, 0)
+
+  // counter of node who positivly responded to request-vote
+  go func() {
+    for ; okNode != len(sm.Cluster.Nodes); okNode++ {
+      <- addOkNode
+    }
+
+    done <- struct{}{}
+  }()
+
   go func() {
     for nodeName, _ := range sm.Cluster.Nodes {
       if nodeName == sm.State.MyId {
@@ -77,7 +90,7 @@ func (rpc *RPC) StartElection() {
 
       switch statusCode := resp.StatusCode; statusCode {
         case 200:
-          done <- struct{}{}
+          addOkNode <- struct{}{}
         default:
           return
       }
@@ -88,6 +101,12 @@ func (rpc *RPC) StartElection() {
     select {
       case <- timer.C:
         timer.Stop()
+
+        // if the majority has been reached, break the loop and become leader
+        if uint(okNode) >= sm.Cluster.Majority {
+          break LOOP
+        }
+
         return
       case <- done:
         break LOOP
@@ -102,26 +121,59 @@ func (rpc *RPC) StartElection() {
     }()
 
     for state := sm.State.Is(); state == LEADER; state = sm.State.Is() {
+      timer = time.NewTimer(50 * time.Millisecond)
+
+      addOkNode = make(chan struct{}, len(sm.Cluster.Nodes))
+      // we start at one because we implicitly count this statemachine
+      okNode = 1
+      done = make(chan struct{}, 0)
+
+      // counter of node who positivly responded to request-vote
+      go func() {
+        for ; okNode != len(sm.Cluster.Nodes); okNode++ {
+          <- addOkNode
+        }
+
+        done <- struct{}{}
+      }()
+
       for nodeName, _ := range sm.Cluster.Nodes {
         if nodeName == sm.State.MyId {
           continue
         }
 
-        log.Println("AppendEntry RPC started for: ", sm.State.MyId)
-        client := &http.Client{}
-        form := url.Values{}
-        form.Set("term", strconv.FormatUint(sm.State.CurrentTerm, 10))
-        req, err := http.NewRequest("POST", fmt.Sprintf("http://%s/append-entry?%s", nodeName, form.Encode()), bytes.NewBufferString("[]"))
-        if err != nil {
-          return
-        }
-        req.Header.Add("Content-Type", "application/json")
-        _, err = client.Do(req)
-        if err != nil {
-          return
+        go func(nodeName string) {
+          defer func() {
+            addOkNode <- struct{}{}
+          }()
+
+          log.Println("AppendEntry RPC started for: ", sm.State.MyId, " to: ", nodeName)
+          client := &http.Client{}
+          form := url.Values{}
+          form.Set("term", strconv.FormatUint(sm.State.CurrentTerm, 10))
+          req, err := http.NewRequest("POST", fmt.Sprintf("http://%s/append-entry?%s", nodeName, form.Encode()), bytes.NewBufferString("[]"))
+          if err != nil {
+            return
+          }
+          req.Header.Add("Content-Type", "application/json")
+          _, err = client.Do(req)
+          if err != nil {
+            return
+          }
+        }(nodeName)
+      }
+
+      LOOP: for {
+        select {
+          case <- timer.C:
+            timer.Stop()
+            break LOOP
+          case <- done:
+            <- time.Tick(50 * time.Millisecond)
+            break LOOP
         }
       }
-      <- time.Tick(50 * time.Millisecond)
+
     }
   }()
 }
