@@ -74,11 +74,11 @@ func (s *State) Switch(state string) error {
   // Call the function in the cases
   switch state {
     case FOLLOWER:
-      <- time.Tick(175 * time.Millisecond)
+      <- time.Tick(1 * time.Millisecond)
     case CANDIDATE:
-      <- time.Tick(175 * time.Millisecond)
+      <- time.Tick(1 * time.Millisecond)
     case LEADER:
-      <- time.Tick(175 * time.Millisecond)
+      <- time.Tick(1 * time.Millisecond)
   }
 
   // Apply the status if the case bellow has been
