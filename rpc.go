@@ -9,6 +9,7 @@ import (
   "encoding/json"
   "net/url"
   "bytes"
+  "log"
 )
 
 // Used to store any field to interact with the RPC
@@ -106,6 +107,7 @@ func (rpc *RPC) StartElection() {
           continue
         }
 
+        log.Println("AppendEntry RPC started for: ", sm.State.MyId)
         client := &http.Client{}
         form := url.Values{}
         form.Set("term", strconv.FormatUint(sm.State.CurrentTerm, 10))
@@ -279,6 +281,7 @@ func NewRPC(sm *StateMachine) (*RPC, error) {
 
     // Acquire the lock since we'll write and we don't want dirty reads
     sm.State.SyncTerm <- struct{}{}
+
     defer func() {
       // Send back the Current-Term in the response
       w.Header().Add("X-Current-Term", strconv.FormatUint(sm.State.CurrentTerm, 10))
@@ -334,7 +337,7 @@ func NewRPC(sm *StateMachine) (*RPC, error) {
     // We need to check if VotedFor is not null AND VotedFor is not the same candidate's ID
     // Otherwise since there is only one VotedFor per term and at start up the VotedFor is null
     // respond to false.
-    fmt.Println("receive vote: ", r.Form, "votedFor :", sm.State.VotedFor, "myterm :", sm.State.CurrentTerm)
+    log.Println(sm.State.MyId, "receive vote: ", r.Form, "votedFor :", sm.State.VotedFor, "myterm :", sm.State.CurrentTerm)
     if newTerm == sm.State.CurrentTerm {
       if sm.State.VotedFor != "" && sm.State.VotedFor != candidate {
         statusCode = 422
