@@ -52,8 +52,6 @@ func (rpc *RPC) StartElection() {
 
   sm.State.VotedFor = sm.State.MyId
 
-  timer := time.NewTimer(300 * time.Millisecond)
-
   addOkNode := make(chan struct{}, len(sm.Cluster.Nodes))
   // we start at one because we implicitly count this statemachine
   okNode := 1
@@ -97,6 +95,7 @@ func (rpc *RPC) StartElection() {
     }
   }()
 
+  timer := time.NewTimer(100 * time.Millisecond)
   LOOP: for {
     select {
       case <- timer.C:
@@ -107,6 +106,7 @@ func (rpc *RPC) StartElection() {
           break LOOP
         }
 
+        sm.Timer.Start()
         return
       case <- done:
         break LOOP
@@ -147,7 +147,7 @@ func (rpc *RPC) StartElection() {
             addOkNode <- struct{}{}
           }()
 
-          log.Println("AppendEntry RPC started for: ", sm.State.MyId, " to: ", nodeName)
+          //log.Println("AppendEntry RPC started for: ", sm.State.MyId, " to: ", nodeName)
           client := &http.Client{}
           form := url.Values{}
           form.Set("term", strconv.FormatUint(sm.State.CurrentTerm, 10))
@@ -333,6 +333,7 @@ func NewRPC(sm *StateMachine) (*RPC, error) {
 
     // Acquire the lock since we'll write and we don't want dirty reads
     sm.State.SyncTerm <- struct{}{}
+    sm.Timer.Stop()
 
     defer func() {
       // Send back the Current-Term in the response
@@ -340,6 +341,7 @@ func NewRPC(sm *StateMachine) (*RPC, error) {
       w.WriteHeader(statusCode)
 
       // Unlock
+      sm.Timer.Start()
       <- sm.State.SyncTerm
     }()
 
@@ -401,7 +403,6 @@ func NewRPC(sm *StateMachine) (*RPC, error) {
     // if Voted yes, convert to follower and vote for him
     if sm.State.Is() != FOLLOWER {
       sm.State.Switch(FOLLOWER)
-      sm.Timer.Start()
     }
 
     sm.State.CurrentTerm = newTerm
